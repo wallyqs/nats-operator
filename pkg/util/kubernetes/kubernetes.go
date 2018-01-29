@@ -71,7 +71,7 @@ func GetPodNames(pods []*v1.Pod) []string {
 }
 
 func MakeNATSImage(version string) string {
-	return fmt.Sprintf("quay.io/pires/docker-nats:%v", version)
+	return fmt.Sprintf("nats:%v", version)
 }
 
 func PodWithNodeSelector(p *v1.Pod, ns map[string]string) *v1.Pod {
