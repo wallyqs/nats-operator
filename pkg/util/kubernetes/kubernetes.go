@@ -304,8 +304,8 @@ func ClonePod(p *v1.Pod) *v1.Pod {
 }
 
 func CloneSvc(s *v1.Service) *v1.Service {
-    ns, err := scheme.Scheme.DeepCopy(s)
-    if err != nil {
+	ns, err := scheme.Scheme.DeepCopy(s)
+	if err != nil {
 		panic("cannot deep copy svc")
 	}
 	return ns.(*v1.Service)
