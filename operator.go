@@ -19,7 +19,7 @@ type Operator struct {
 
 // Run starts the main loop.
 func (op *Operator) Run(ctx context.Context) error {
-	// Prepare setting up the CRD in in case it does not exist already
+	// Prepare setting up the CRD in in case it does not exist already.
 
 	// Set up cancellation context for the main loop.
 	ctx, cancelFn := context.WithCancel(ctx)

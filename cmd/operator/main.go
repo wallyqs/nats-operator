@@ -55,7 +55,6 @@ func main() {
 	logger = log.With(logger, "time", log.DefaultTimestampUTC)
 	logger = log.With(logger, "pid", os.Getpid())
 
-	// Build a configured NATS Operator.
 	op, err := natsoperator.NewOperator(
 		natsoperator.LoggingOptions(logger, debugMode, traceMode),
 	)
@@ -64,8 +63,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Top level context which if cancelled stops the
-	// operator the main loop from the operator.
+	// Top level context which if canceled stops the
+	// the main loop from the operator.
 	ctx := context.Background()
 
 	// Signal handling.
@@ -85,7 +84,7 @@ func main() {
 
 			switch sig {
 			case syscall.SIGINT:
-				op.Noticef("Operator Exiting...")
+				op.Noticef("Exiting...")
 				os.Exit(0)
 				return
 			case syscall.SIGTERM:
