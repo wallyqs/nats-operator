@@ -28,7 +28,7 @@ func init() {
 		fmt.Fprintf(os.Stderr, "\n")
 	}
 
-	// Show help and version
+	// Help and version
 	fs.BoolVar(&showHelp, "h", false, "Show help")
 	fs.BoolVar(&showHelp, "help", false, "Show help")
 	fs.BoolVar(&showVersion, "v", false, "Show version")
