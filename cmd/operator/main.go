@@ -12,12 +12,14 @@ import (
 	natsoperator "github.com/nats-io/nats-kubernetes/operators/nats-server"
 )
 
-// Command Line Options Flags
 var (
+	// Command Line Options Flags
 	showHelp    bool
 	showVersion bool
 	debugMode   bool
 	traceMode   bool
+	namespace   string
+	podname     string
 )
 
 func init() {
@@ -39,6 +41,12 @@ func init() {
 	fs.BoolVar(&debugMode, "D", false, "Show debug logs")
 	fs.BoolVar(&traceMode, "trace", false, "Show trace logs")
 	fs.BoolVar(&traceMode, "V", false, "Show trace logs")
+
+	// Kubernetes options
+	fs.StringVar(&namespace, "ns", "default", "Kubernetes Pod Namespace")
+	fs.StringVar(&namespace, "namespace", "default", "Kubernetes Pod Namespace")
+	fs.StringVar(&podname, "podname", "nats-server-operator", "Kubernetes Pod Name")
+
 	fs.Parse(os.Args[1:])
 
 	switch {
@@ -58,6 +66,7 @@ func main() {
 
 	op, err := natsoperator.NewOperator(
 		natsoperator.LoggingOptions(logger, debugMode, traceMode),
+		natsoperator.KubernetesOptions(namespace, podname),
 	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Configuration error: %s\n", err)
