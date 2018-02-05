@@ -3,11 +3,14 @@ package natsoperator
 
 import (
 	"context"
+	"net/http"
+	"time"
 
 	k8sextensionsobj "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	k8scrdclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	k8sapierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8swaitutil "k8s.io/apimachinery/pkg/util/wait"
 	k8sclient "k8s.io/client-go/kubernetes"
 	k8srestapi "k8s.io/client-go/rest"
 )
@@ -160,6 +163,26 @@ func (op *Operator) RegisterCRDs(context.Context) error {
 	if _, err := crdc.Create(crd); err != nil && !k8sapierrors.IsAlreadyExists(err) {
 		return err
 	}
+	op.Noticef("CRD created successfully")
+
+	// Wait for CRD to be ready.
+	err = k8swaitutil.Poll(3*time.Second, 10*time.Minute, func() (bool, error) {
+		_, err := op.kcrdc.ApiextensionsV1beta1().CustomResourceDefinitions().Get("natsserverclusters.alpha.nats.io", k8smetav1.GetOptions{})
+		if err != nil {
+			if se, ok := err.(*k8sapierrors.StatusError); ok {
+				if se.Status().Code == http.StatusNotFound {
+					return false, nil
+				}
+			}
+			return false, err
+		}
+
+		return true, nil
+	})
+	if err != nil {
+		op.Errorf("Gave up waiting for CRD to be ready: %s", err)
+	}
+	op.Noticef("Detected CRD is ready to use")
 
 	return nil
 }
