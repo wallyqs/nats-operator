@@ -3,16 +3,21 @@ package natsoperator
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
-	k8sextensionsobj "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	k8sapiv1 "k8s.io/api/core/v1"
+	k8sapiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	k8scrdclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	k8sapierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8swaitutil "k8s.io/apimachinery/pkg/util/wait"
 	k8sclient "k8s.io/client-go/kubernetes"
 	k8srestapi "k8s.io/client-go/rest"
+	// k8swatch "k8s.io/apimachinery/pkg/watch"
+	k8sfields "k8s.io/apimachinery/pkg/fields"
+	k8scache "k8s.io/client-go/tools/cache"
 )
 
 // Operator manages NATS Clusters running in Kubernetes.
@@ -67,9 +72,10 @@ func (op *Operator) Run(ctx context.Context) error {
 
 	// Set up cancellation context for the main loop.
 	ctx, cancelFn := context.WithCancel(ctx)
-	op.quit = func() {
-		cancelFn()
-	}
+	defer cancelFn()
+	// op.quit = func() {
+	// 	cancelFn()
+	// }
 
 	// Setup connection between the Operator and Kubernetes
 	// and register CRD to make available API group.
@@ -77,8 +83,70 @@ func (op *Operator) Run(ctx context.Context) error {
 		return err
 	}
 
+	// Event Handlers -----------------------------------------------------
+
+	// What is this...
+	podListWatcher := k8scache.NewListWatchFromClient(
+		kc.CoreV1().RESTClient(), // Have to generate this???
+		"natsserverclusters",
+		op.ns,
+		k8sfields.Everything(),
+	)
+
+	indexer, informer := k8scache.NewIndexerInformer(podListWatcher, &k8sapiv1.Pod{}, 0, k8scache.ResourceEventHandlerFuncs{
+		AddFunc: func(pod interface{}) {
+			op.Noticef("New! %+v", pod)
+			// key, err := cache.MetaNamespaceKeyFunc(obj)
+			// if err == nil {
+			// 	queue.Add(key)
+			// }
+		},
+		UpdateFunc: func(pod interface{}, new interface{}) {
+			op.Noticef("Updated! %+v", pod)
+			// key, err := cache.MetaNamespaceKeyFunc(new)
+			// if err == nil {
+			// 	queue.Add(key)
+			// }
+		},
+		DeleteFunc: func(pod interface{}) {
+			op.Noticef("Bye! %+v", pod)
+			// IndexerInformer uses a delta queue, therefore for deletes we have to use this
+			// key function.
+			// key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+			// if err == nil {
+			// 	queue.Add(key)
+			// }
+		},
+	}, k8scache.Indexers{})
+	op.Debugf("============== Informer: %+v", informer)
+	op.Debugf("============== Indexer: %+v", indexer)
+
+	// source := cache.NewListWatchFromClient(
+	// 	c.Config.EtcdCRCli.EtcdV1beta2().RESTClient(),
+	// 	"natsserverclusters",
+	// 	c.Config.Namespace,
+	// 	fields.Everything())
+
+	// _, informer := cache.NewIndexerInformer(source, &api.EtcdCluster{}, 0, cache.ResourceEventHandlerFuncs{
+	// 	AddFunc:    c.onAddEtcdClus,
+	// 	UpdateFunc: c.onUpdateEtcdClus,
+	// 	DeleteFunc: c.onDeleteEtcdClus,
+	// }, cache.Indexers{})
+
+	// Ideally should be context but the `informer` takes a channel.
+	informerStopCh := make(chan struct{})
+
+	// Release all resources on shutdown.
+	op.quit = func() {
+		close(informerStopCh)
+		cancelFn()
+	}
+
+	// TODO: Waitgroup since awaiting for various goroutines now
+	go informer.Run(informerStopCh)
+
+	// Wait until context is done.
 	for {
-		// TODO: Implement events polling
 		select {
 		case <-ctx.Done():
 			op.Noticef("Bye!")
@@ -107,23 +175,71 @@ func (op *Operator) RegisterCRDs(context.Context) error {
 	op.Noticef("Running on Kubernetes Cluster %v", v)
 
 	// Create the CRD if it does not exists.
-	crd := &k8sextensionsobj.CustomResourceDefinition{
+	crdc := op.kcrdc.ApiextensionsV1beta1().CustomResourceDefinitions()
+	if _, err := crdc.Create(NATSClusterCRD()); err != nil && !k8sapierrors.IsAlreadyExists(err) {
+		return err
+	}
+	op.Noticef("CRD created successfully")
+
+	// Wait for CRD to be ready.
+	err = k8swaitutil.Poll(3*time.Second, 10*time.Minute, func() (bool, error) {
+		result, err := op.kcrdc.ApiextensionsV1beta1().CustomResourceDefinitions().Get(
+			"natsserverclusters.alpha.nats.io",
+			k8smetav1.GetOptions{},
+		)
+		if err != nil {
+			if se, ok := err.(*k8sapierrors.StatusError); ok {
+				if se.Status().Code == http.StatusNotFound {
+					return false, nil
+				}
+			}
+			return false, err
+		}
+
+		// Confirm that the CRD condition has converged
+		// to the 'established' state.
+		for _, cond := range result.Status.Conditions {
+			switch cond.Type {
+			case k8sapiextensionsv1beta1.Established:
+				if cond.Status == k8sapiextensionsv1beta1.ConditionTrue {
+					return true, nil
+				}
+			case k8sapiextensionsv1beta1.NamesAccepted:
+				if cond.Status == k8sapiextensionsv1beta1.ConditionFalse {
+					return false, fmt.Errorf("Name conflict: %v", cond.Reason)
+				}
+			}
+		}
+
+		return true, nil
+	})
+	if err != nil {
+		op.Errorf("Gave up waiting for CRD to be ready: %s", err)
+	}
+	op.Noticef("CRD is ready")
+
+	return nil
+}
+
+// NATSClusterCRD returns a representation of the CRD to register.
+func NATSClusterCRD() *k8sapiextensionsv1beta1.CustomResourceDefinition {
+	return &k8sapiextensionsv1beta1.CustomResourceDefinition{
 		// ---
 		// apiVersion: apiextensions.k8s.io/v1beta1
 		// kind: CustomResourceDefinition
 		// ...
 		TypeMeta: k8smetav1.TypeMeta{
-			Kind:       "CustomResourceDefinition",
 			APIVersion: "apiextensions.k8s.io/v1beta1",
+			Kind:       "CustomResourceDefinition",
 		},
 		// metadata:
 		//   # name must match the spec fields below, and be
 		//   # in the form: <plural>.<group>
-		//   name: natsserverclusters.alpha.nats.io
+		//   name: natsserverclusters.nats.io
 		ObjectMeta: k8smetav1.ObjectMeta{
-			Name: "natsserverclusters.alpha.nats.io",
+			Name: "natsserverclusters.nats.io",
 		},
-		Spec: k8sextensionsobj.CustomResourceDefinitionSpec{
+		Spec: k8sapiextensionsv1beta1.CustomResourceDefinitionSpec{
 			// # group name to use for REST API: /apis/<group>/<version>
 			// group: alpha.nats.io
 			//
@@ -132,10 +248,10 @@ func (op *Operator) RegisterCRDs(context.Context) error {
 			//
 			// # either Namespaced or Cluster
 			// scope: Namespaced
-			Group:   "alpha.nats.io",
+			Group:   "nats.io",
 			Version: "v1alpha2",
-			Scope:   k8sextensionsobj.ResourceScope("Namespaced"),
-			Names: k8sextensionsobj.CustomResourceDefinitionNames{
+			Scope:   k8sapiextensionsv1beta1.ResourceScope("Namespaced"),
+			Names: k8sapiextensionsv1beta1.CustomResourceDefinitionNames{
 				// # plural name to be used in the
 				// # URL:
 				// # /apis/<group>/<version>/<plural>
@@ -158,31 +274,4 @@ func (op *Operator) RegisterCRDs(context.Context) error {
 			},
 		},
 	}
-
-	crdc := op.kcrdc.ApiextensionsV1beta1().CustomResourceDefinitions()
-	if _, err := crdc.Create(crd); err != nil && !k8sapierrors.IsAlreadyExists(err) {
-		return err
-	}
-	op.Noticef("CRD created successfully")
-
-	// Wait for CRD to be ready.
-	err = k8swaitutil.Poll(3*time.Second, 10*time.Minute, func() (bool, error) {
-		_, err := op.kcrdc.ApiextensionsV1beta1().CustomResourceDefinitions().Get("natsserverclusters.alpha.nats.io", k8smetav1.GetOptions{})
-		if err != nil {
-			if se, ok := err.(*k8sapierrors.StatusError); ok {
-				if se.Status().Code == http.StatusNotFound {
-					return false, nil
-				}
-			}
-			return false, err
-		}
-
-		return true, nil
-	})
-	if err != nil {
-		op.Errorf("Gave up waiting for CRD to be ready: %s", err)
-	}
-	op.Noticef("Detected CRD is ready to use")
-
-	return nil
 }

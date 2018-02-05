@@ -2,6 +2,12 @@
 
 
 [[projects]]
+  name = "github.com/davecgh/go-spew"
+  packages = ["spew"]
+  revision = "346938d642f2ec3594ed81d874461961cd0faa76"
+  version = "v1.1.0"
+
+[[projects]]
   name = "github.com/ghodss/yaml"
   packages = ["."]
   revision = "0ca9ea5df5451ffdf184b4428c902747c2c11cd7"
@@ -69,6 +75,15 @@
   version = "v0.1.0"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/hashicorp/golang-lru"
+  packages = [
+    ".",
+    "simplelru"
+  ]
+  revision = "0fb14efe8c47ae851c0034ed7a448854d3d34cf3"
+
+[[projects]]
   name = "github.com/json-iterator/go"
   packages = ["."]
   revision = "28452fcdec4e44348d2af0d91d1e9e38da3a9e0a"
@@ -96,6 +111,7 @@
   branch = "master"
   name = "golang.org/x/net"
   packages = [
+    "context",
     "http2",
     "http2/hpack",
     "idna",
@@ -190,6 +206,7 @@
     "pkg/api/errors",
     "pkg/api/meta",
     "pkg/api/resource",
+    "pkg/apis/meta/internalversion",
     "pkg/apis/meta/v1",
     "pkg/apis/meta/v1/unstructured",
     "pkg/apis/meta/v1alpha1",
@@ -207,7 +224,9 @@
     "pkg/runtime/serializer/versioning",
     "pkg/selection",
     "pkg/types",
+    "pkg/util/cache",
     "pkg/util/clock",
+    "pkg/util/diff",
     "pkg/util/errors",
     "pkg/util/framer",
     "pkg/util/intstr",
@@ -263,19 +282,23 @@
     "pkg/version",
     "rest",
     "rest/watch",
+    "tools/cache",
     "tools/clientcmd/api",
     "tools/metrics",
+    "tools/pager",
     "tools/reference",
     "transport",
+    "util/buffer",
     "util/cert",
     "util/flowcontrol",
-    "util/integer"
+    "util/integer",
+    "util/retry"
   ]
   revision = "e2d750fcad023e759abc09adcbe3706a6126020d"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "633fbe63569f01abcf9fa1b4fedfbbb4dd9018040ed67869b6404d3ccdd3d2f2"
+  inputs-digest = "c684d68dd09702a211732578dbba3e290a863aa76b2e46a62c6b856a334d13c6"
   solver-name = "gps-cdcl"
   solver-version = 1
