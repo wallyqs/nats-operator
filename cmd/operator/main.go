@@ -21,24 +21,25 @@ var (
 )
 
 func init() {
+	fs := flag.NewFlagSet("nats-server-operator", flag.ExitOnError)
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: nats-server-operator [options...]\n\n")
-		flag.PrintDefaults()
+		fs.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\n")
 	}
 
 	// Show help and version
-	flag.BoolVar(&showHelp, "h", false, "Show help")
-	flag.BoolVar(&showHelp, "help", false, "Show help")
-	flag.BoolVar(&showVersion, "v", false, "Show version")
-	flag.BoolVar(&showVersion, "version", false, "Show version")
+	fs.BoolVar(&showHelp, "h", false, "Show help")
+	fs.BoolVar(&showHelp, "help", false, "Show help")
+	fs.BoolVar(&showVersion, "v", false, "Show version")
+	fs.BoolVar(&showVersion, "version", false, "Show version")
 
 	// Logging options
-	flag.BoolVar(&debugMode, "debug", false, "Show debug logs")
-	flag.BoolVar(&debugMode, "D", false, "Show debug logs")
-	flag.BoolVar(&traceMode, "trace", false, "Show trace logs")
-	flag.BoolVar(&traceMode, "V", false, "Show trace logs")
-	flag.Parse()
+	fs.BoolVar(&debugMode, "debug", false, "Show debug logs")
+	fs.BoolVar(&debugMode, "D", false, "Show debug logs")
+	fs.BoolVar(&traceMode, "trace", false, "Show trace logs")
+	fs.BoolVar(&traceMode, "V", false, "Show trace logs")
+	fs.Parse(os.Args[1:])
 
 	switch {
 	case showHelp:
