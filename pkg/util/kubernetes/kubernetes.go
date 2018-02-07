@@ -15,8 +15,10 @@
 package kubernetes
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net"
 	"os"
 	"time"
@@ -94,11 +96,11 @@ func CreateClientService(kubecli corev1client.CoreV1Interface, clusterName, ns s
 		Protocol:   v1.ProtocolTCP,
 	}}
 	selectors := LabelsForCluster(clusterName)
-	return createService(kubecli, clusterName, clusterName, ns, "", ports, owner, selectors, false)
+	return createService(kubecli, clusterName+"-client", clusterName, ns, "", ports, owner, selectors, false)
 }
 
 func ManagementServiceName(clusterName string) string {
-	return clusterName + "-mgmt"
+	return clusterName // + "-mgmt"
 }
 
 // CreateMgmtService creates an headless service for NATS management purposes.
@@ -198,19 +200,28 @@ func NewNatsPodSpec(clusterName string, cs spec.ClusterSpec, owner metav1.OwnerR
 	volumes := []v1.Volume{}
 
 	container := natsPodContainer(clusterName, cs.Version)
-	container = containerWithLivenessProbe(container, natsLivenessProbe(cs.TLS.IsSecureClient()))
 
 	if cs.Pod != nil {
 		container = containerWithRequirements(container, cs.Pod.Resources)
 	}
 
+	// Unique name for the pod
+	number, _ := rand.Int(rand.Reader, big.NewInt(1000))
+	name := fmt.Sprintf("nats-%d", number)
+
+	cmd := []string{"/gnatsd", "-m", "8222", "--cluster", "nats://0.0.0.0:6222"}
+	container.Command = cmd
+
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:       labels,
-			GenerateName: fmt.Sprintf("nats-%s-", clusterName),
-			Annotations:  map[string]string{},
+			Name:   name,
+			Labels: labels,
+			// GenerateName: fmt.Sprintf("nats-%s-", clusterName),
+			Annotations: map[string]string{},
 		},
 		Spec: v1.PodSpec{
+			Hostname:      name,
+			Subdomain:     clusterName,
 			Containers:    []v1.Container{container},
 			RestartPolicy: v1.RestartPolicyNever,
 			Volumes:       volumes,

@@ -309,12 +309,13 @@ func (c *Cluster) delete() {
 }
 
 func (c *Cluster) setupServices() error {
-	err := kubernetesutil.CreateClientService(c.config.KubeCli, c.cluster.Name, c.cluster.Namespace, c.cluster.AsOwner())
+	// TODO: Not creating headless service prevents generating A records for pods?
+	err := kubernetesutil.CreateMgmtService(c.config.KubeCli, c.cluster.Name, c.cluster.Spec.Version, c.cluster.Namespace, c.cluster.AsOwner())
 	if err != nil {
 		return err
 	}
 
-	return kubernetesutil.CreateMgmtService(c.config.KubeCli, c.cluster.Name, c.cluster.Spec.Version, c.cluster.Namespace, c.cluster.AsOwner())
+	return kubernetesutil.CreateClientService(c.config.KubeCli, c.cluster.Name, c.cluster.Namespace, c.cluster.AsOwner())
 }
 
 func (c *Cluster) createPod() error {
