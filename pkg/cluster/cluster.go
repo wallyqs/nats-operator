@@ -318,8 +318,8 @@ func (c *Cluster) setupServices() error {
 	return kubernetesutil.CreateClientService(c.config.KubeCli, c.cluster.Name, c.cluster.Namespace, c.cluster.AsOwner())
 }
 
-func (c *Cluster) createPod() error {
-	pod := kubernetesutil.NewNatsPodSpec(c.cluster.Name, c.cluster.Spec, c.cluster.AsOwner())
+func (c *Cluster) createPod(clusterNames []string) error {
+	pod := kubernetesutil.NewNatsPodSpec(c.cluster.Name, c.cluster.Spec, c.cluster.AsOwner(), clusterNames)
 
 	_, err := c.config.KubeCli.Pods(c.cluster.Namespace).Create(pod)
 

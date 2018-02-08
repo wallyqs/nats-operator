@@ -21,6 +21,7 @@ import (
 	"math/big"
 	"net"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/pires/nats-operator/pkg/constants"
@@ -190,7 +191,7 @@ func addOwnerRefToObject(o metav1.Object, r metav1.OwnerReference) {
 }
 
 // NewNatsPodSpec returns a NATS peer pod specification, based on the cluster specification.
-func NewNatsPodSpec(clusterName string, cs spec.ClusterSpec, owner metav1.OwnerReference) *v1.Pod {
+func NewNatsPodSpec(clusterName string, cs spec.ClusterSpec, owner metav1.OwnerReference, clusterNames []string) *v1.Pod {
 	labels := map[string]string{
 		LabelAppKey:            "nats",
 		LabelClusterNameKey:    clusterName,
@@ -209,7 +210,13 @@ func NewNatsPodSpec(clusterName string, cs spec.ClusterSpec, owner metav1.OwnerR
 	number, _ := rand.Int(rand.Reader, big.NewInt(1000))
 	name := fmt.Sprintf("nats-%d", number)
 
-	cmd := []string{"/gnatsd", "-m", "8222", "--cluster", "nats://0.0.0.0:6222"}
+	cmd := []string{"/gnatsd", "-DV", "-m", "8222", "--cluster", "nats://0.0.0.0:6222"}
+
+	if len(clusterNames) > 0 {
+		routes := strings.Join(clusterNames, ",")
+		cmd = append(cmd, "--routes", routes)
+	}
+
 	container.Command = cmd
 
 	pod := &v1.Pod{
