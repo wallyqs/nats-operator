@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	k8sapiv1 "k8s.io/api/core/v1"
@@ -18,6 +19,7 @@ import (
 	// k8swatch "k8s.io/apimachinery/pkg/watch"
 	k8sfields "k8s.io/apimachinery/pkg/fields"
 	k8scache "k8s.io/client-go/tools/cache"
+	k8sclientcmd "k8s.io/client-go/tools/clientcmd"
 )
 
 // Operator manages NATS Clusters running in Kubernetes.
@@ -46,14 +48,21 @@ type Operator struct {
 func (op *Operator) Run(ctx context.Context) error {
 	op.Noticef("Starting NATS Server Kubernetes Operator v%s", Version)
 
-	// Setup configuration for when operator runs within
-	// Kubernetes and the API client for making requests, then
-	// prepare setting up the CRD in in case it does not exist
-	// already.
-	cfg, err := k8srestapi.InClusterConfig()
+	// Setup configuration for when operator runs inside/outside
+	// the cluster and the API client for making requests.
+	// By default, consider that the operator runs in Kubernetes,
+	// but allow to use a config file too for dev/testing purposes.
+	var err error
+	var cfg *k8srestapi.Config
+	if kubeconfig := os.Getenv(KubeConfigEnvVar); kubeconfig != "" {
+		cfg, err = k8sclientcmd.BuildConfigFromFlags("", kubeconfig)
+	} else {
+		cfg, err = k8srestapi.InClusterConfig()
+	}
 	if err != nil {
 		return err
 	}
+
 	kc, err := k8sclient.NewForConfig(cfg)
 	if err != nil {
 		return err
@@ -78,8 +87,9 @@ func (op *Operator) Run(ctx context.Context) error {
 	// }
 
 	// Setup connection between the Operator and Kubernetes
-	// and register CRD to make available API group.
-	if err := op.RegisterCRDs(ctx); err != nil {
+	// and register CRD to make available API group in case
+	// not done already.
+	if err := op.RegisterCRD(ctx); err != nil {
 		return err
 	}
 
@@ -88,7 +98,8 @@ func (op *Operator) Run(ctx context.Context) error {
 	// What is this...
 	podListWatcher := k8scache.NewListWatchFromClient(
 		kc.CoreV1().RESTClient(), // Have to generate this???
-		"natsserverclusters",
+		"pods",
+		// "natsserverclusters",
 		op.ns,
 		k8sfields.Everything(),
 	)
@@ -163,10 +174,10 @@ func (op *Operator) Shutdown() {
 	op.quit()
 }
 
-// RegisterCRDs confirms that the operator can dial into the
+// RegisterCRD confirms that the operator can dial into the
 // Kubernetes API Server and creates the CRDs in case not currently
 // present.
-func (op *Operator) RegisterCRDs(context.Context) error {
+func (op *Operator) RegisterCRD(context.Context) error {
 	// Ping the server and bail already if there is no connectivity.
 	v, err := op.kc.Discovery().ServerVersion()
 	if err != nil {
