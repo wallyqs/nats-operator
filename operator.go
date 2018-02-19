@@ -81,10 +81,6 @@ func (op *Operator) Run(ctx context.Context) error {
 
 	// Set up cancellation context for the main loop.
 	ctx, cancelFn := context.WithCancel(ctx)
-	defer cancelFn()
-	// op.quit = func() {
-	// 	cancelFn()
-	// }
 
 	// Setup connection between the Operator and Kubernetes
 	// and register CRD to make available API group in case
@@ -93,9 +89,8 @@ func (op *Operator) Run(ctx context.Context) error {
 		return err
 	}
 
-	// Event Handlers -----------------------------------------------------
-
-	// What is this...
+	// --- WORK IN PROGRESS STARTS HERE ---
+	// TODO: Need a custom watcher to be able to detect the new objects.
 	podListWatcher := k8scache.NewListWatchFromClient(
 		kc.CoreV1().RESTClient(), // Have to generate this???
 		"pods",
@@ -195,7 +190,7 @@ func (op *Operator) RegisterCRD(context.Context) error {
 	// Wait for CRD to be ready.
 	err = k8swaitutil.Poll(3*time.Second, 10*time.Minute, func() (bool, error) {
 		result, err := op.kcrdc.ApiextensionsV1beta1().CustomResourceDefinitions().Get(
-			"natsserverclusters.alpha.nats.io",
+			CRDObjectFullName,
 			k8smetav1.GetOptions{},
 		)
 		if err != nil {
@@ -226,8 +221,9 @@ func (op *Operator) RegisterCRD(context.Context) error {
 	})
 	if err != nil {
 		op.Errorf("Gave up waiting for CRD to be ready: %s", err)
+	} else {
+		op.Noticef("CRD is ready")
 	}
-	op.Noticef("CRD is ready")
 
 	return nil
 }
@@ -246,37 +242,39 @@ func NATSClusterCRD() *k8sapiextensionsv1beta1.CustomResourceDefinition {
 		// metadata:
 		//   # name must match the spec fields below, and be
 		//   # in the form: <plural>.<group>
-		//   name: natsserverclusters.nats.io
+		//   name: natsclusters.messaging.nats.io
 		ObjectMeta: k8smetav1.ObjectMeta{
-			Name: "natsserverclusters.nats.io",
+			Name: CRDObjectFullName,
 		},
 		Spec: k8sapiextensionsv1beta1.CustomResourceDefinitionSpec{
 			// # group name to use for REST API: /apis/<group>/<version>
-			// group: alpha.nats.io
+			// group: messaging.nats.io
 			//
 			// # version name to use for REST API: /apis/<group>/<version>
 			// version: v1alpha2
 			//
 			// # either Namespaced or Cluster
 			// scope: Namespaced
-			Group:   "nats.io",
-			Version: "v1alpha2",
-			Scope:   k8sapiextensionsv1beta1.ResourceScope("Namespaced"),
+			Group:   APIGroup,
+			Version: APIVersion,
+
+			// FIXME: Eventually be able to support all cluster.
+			Scope: k8sapiextensionsv1beta1.ResourceScope("Namespaced"),
 			Names: k8sapiextensionsv1beta1.CustomResourceDefinitionNames{
 				// # plural name to be used in the
 				// # URL:
 				// # /apis/<group>/<version>/<plural>
 				// plural: natsserverclusters
-				Plural: "natsserverclusters",
+				Plural: CRDObjectPluralName,
 
 				// # singular name to be used as an
 				// # alias on the CLI and for display
 				// singular: natsserverclusters
-				Singular: "natsservercluster",
+				Singular: CRDObjectName,
 
 				// # kind is normally the CamelCased singular type.
 				// kind: NatsServerCluster
-				Kind: "NatsServerCluster",
+				Kind: CRDObjectKindName,
 
 				// # shortNames allow shorter string
 				// # to match your resource on the CLI

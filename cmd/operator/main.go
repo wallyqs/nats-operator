@@ -85,7 +85,7 @@ func main() {
 		for sig := range c {
 			op.Debugf("Trapped '%v' signal", sig)
 
-			// Check if we are done already first.
+			// If main context already done, then just exit.
 			select {
 			case <-ctx.Done():
 				return
@@ -98,7 +98,7 @@ func main() {
 				os.Exit(0)
 				return
 			case syscall.SIGTERM:
-				// Gracefully shutdown the component.
+				// Gracefully shutdown the component,
 				op.Shutdown()
 			}
 		}
