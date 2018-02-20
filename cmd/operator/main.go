@@ -9,7 +9,7 @@ import (
 	"syscall"
 
 	"github.com/go-kit/kit/log"
-	natsoperator "github.com/nats-io/nats-kubernetes/operators/nats-server"
+	natsoperator "github.com/nats-io/nats-kubernetes/operators/nats-server/pkg/operator"
 )
 
 var (

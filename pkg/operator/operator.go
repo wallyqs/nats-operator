@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	k8sapiv1 "k8s.io/api/core/v1"
+	// k8sapiv1 "k8s.io/api/core/v1"
 	k8sapiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	k8scrdclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	k8sapierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -21,6 +21,8 @@ import (
 	k8sclientcmd "k8s.io/client-go/tools/clientcmd"
 
 	// k8swatch "k8s.io/apimachinery/pkg/watch"
+	natscrdv1alpha2 "github.com/nats-io/nats-kubernetes/operators/nats-server/pkg/apis/nats.io/v1alpha2"
+	natscrdclient "github.com/nats-io/nats-kubernetes/operators/nats-server/pkg/generated/versioned"
 )
 
 // Operator manages NATS Clusters running in Kubernetes.
@@ -38,10 +40,13 @@ type Operator struct {
 	kc    k8sclient.Interface
 	kcrdc k8scrdclient.Interface
 
-	// Kubernetes Pod Namespace
+	// NATS operator client.
+	ncrdc natscrdclient.Interface
+
+	// Kubernetes Pod Namespace.
 	ns string
 
-	// Kubernetes Pod Name
+	// Kubernetes Pod Name.
 	podname string
 }
 
@@ -76,6 +81,12 @@ func (op *Operator) Run(ctx context.Context) error {
 	}
 	op.kcrdc = kcrdc
 
+	// Get config for the NATS clusters.
+	ncrdc, err := natscrdclient.NewForConfig(cfg)
+	if err != nil {
+		return err
+	}
+
 	op.Debugf("Kubernetes Cluster Config: %+v", cfg)
 	op.Debugf("Kubernetes Client: %+v", kc)
 	op.Debugf("Kubernetes Extensions Client: %+v", kcrdc)
@@ -90,57 +101,33 @@ func (op *Operator) Run(ctx context.Context) error {
 		return err
 	}
 
-	// --- WORK IN PROGRESS STARTS HERE ---
-	// TODO: Need a custom watcher to be able to detect the new objects.
-	podListWatcher := k8scache.NewListWatchFromClient(
-		kc.CoreV1().RESTClient(), // Have to generate this???
-		"pods",
-		// "natsserverclusters",
+	listWatcher := k8scache.NewListWatchFromClient(
+		// Auto generated client from pkg/apis/nats.io/v1alpha2/types.go
+		ncrdc.NatsV1alpha2().RESTClient(),
+
+		// "natsclusters"
+		CRDObjectPluralName,
+
+		// Namespace where the NATS clusters are created.
+		// TODO: Consider cluster wide option here?
 		op.ns,
 		k8sfields.Everything(),
 	)
 
-	indexer, informer := k8scache.NewIndexerInformer(podListWatcher, &k8sapiv1.Pod{}, 0, k8scache.ResourceEventHandlerFuncs{
-		AddFunc: func(pod interface{}) {
-			op.Noticef("New! %+v", pod)
-			// key, err := cache.MetaNamespaceKeyFunc(obj)
-			// if err == nil {
-			// 	queue.Add(key)
-			// }
+	_, informer := k8scache.NewIndexerInformer(listWatcher, &natscrdv1alpha2.NatsCluster{}, 0, k8scache.ResourceEventHandlerFuncs{
+		AddFunc: func(natsClusterObject interface{}) {
+			op.Tracef("New NATS Cluster: %+v", natsClusterObject)
 		},
-		UpdateFunc: func(pod interface{}, new interface{}) {
-			op.Noticef("Updated! %+v", pod)
-			// key, err := cache.MetaNamespaceKeyFunc(new)
-			// if err == nil {
-			// 	queue.Add(key)
-			// }
+		UpdateFunc: func(natsClusterObject interface{}, new interface{}) {
+			op.Tracef("Updated NATS Cluster: %+v", natsClusterObject)
 		},
-		DeleteFunc: func(pod interface{}) {
-			op.Noticef("Bye! %+v", pod)
-			// IndexerInformer uses a delta queue, therefore for deletes we have to use this
-			// key function.
-			// key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			// if err == nil {
-			// 	queue.Add(key)
-			// }
+		DeleteFunc: func(natsClusterObject interface{}) {
+			op.Tracef("Deleted NATS Cluster: %+v", natsClusterObject)
 		},
 	}, k8scache.Indexers{})
-	op.Debugf("============== Informer: %+v", informer)
-	op.Debugf("============== Indexer: %+v", indexer)
 
-	// source := cache.NewListWatchFromClient(
-	// 	c.Config.EtcdCRCli.EtcdV1beta2().RESTClient(),
-	// 	"natsserverclusters",
-	// 	c.Config.Namespace,
-	// 	fields.Everything())
-
-	// _, informer := cache.NewIndexerInformer(source, &api.EtcdCluster{}, 0, cache.ResourceEventHandlerFuncs{
-	// 	AddFunc:    c.onAddEtcdClus,
-	// 	UpdateFunc: c.onUpdateEtcdClus,
-	// 	DeleteFunc: c.onDeleteEtcdClus,
-	// }, cache.Indexers{})
-
-	// Ideally should be context but the `informer` takes a channel.
+	// FIXME: Ideally should be context here but the `informer`
+	// takes a channel instead :/
 	informerStopCh := make(chan struct{})
 
 	// Release all resources on shutdown.
@@ -149,7 +136,7 @@ func (op *Operator) Run(ctx context.Context) error {
 		cancelFn()
 	}
 
-	// TODO: Waitgroup since awaiting for various goroutines now
+	// FIXME: Use waitgroup since awaiting for various goroutines now.
 	go informer.Run(informerStopCh)
 
 	// Wait until context is done.
@@ -166,7 +153,9 @@ func (op *Operator) Run(ctx context.Context) error {
 func (op *Operator) Shutdown() {
 	op.Noticef("Shutting down...")
 
-	// Done.
+	// TODO: Add wait for goroutines to wrap up
+
+	// Cancel main context to signal exit
 	op.quit()
 }
 
@@ -265,22 +254,22 @@ func NATSClusterCRD() *k8sapiextensionsv1beta1.CustomResourceDefinition {
 				// # plural name to be used in the
 				// # URL:
 				// # /apis/<group>/<version>/<plural>
-				// plural: natsserverclusters
+				// plural: natsclusters
 				Plural: CRDObjectPluralName,
 
 				// # singular name to be used as an
 				// # alias on the CLI and for display
-				// singular: natsserverclusters
+				// singular: natscluster
 				Singular: CRDObjectName,
 
 				// # kind is normally the CamelCased singular type.
-				// kind: NatsServerCluster
+				// kind: NatsCluster
 				Kind: CRDObjectKindName,
 
 				// # shortNames allow shorter string
 				// # to match your resource on the CLI
-				// - shortNames: ["nsc"]
-				ShortNames: []string{"nsc"},
+				// - shortNames: ["nats"]
+				ShortNames: []string{"nats"},
 			},
 		},
 	}
