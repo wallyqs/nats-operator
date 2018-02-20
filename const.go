@@ -21,7 +21,7 @@ const (
 	CRDObjectPluralName = "natsclusters"
 
 	// CRDObjectKindName is the name used for the CRD in the requests payload.
-	CRDObjectKindName = "NatsServerCluster"
+	CRDObjectKindName = "NatsCluster"
 
 	// CRDObjectFullName
 	// e.g. natsclusters.messaging.nats.io

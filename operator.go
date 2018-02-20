@@ -13,13 +13,14 @@ import (
 	k8scrdclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	k8sapierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8smetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8sfields "k8s.io/apimachinery/pkg/fields"
 	k8swaitutil "k8s.io/apimachinery/pkg/util/wait"
 	k8sclient "k8s.io/client-go/kubernetes"
 	k8srestapi "k8s.io/client-go/rest"
-	// k8swatch "k8s.io/apimachinery/pkg/watch"
-	k8sfields "k8s.io/apimachinery/pkg/fields"
 	k8scache "k8s.io/client-go/tools/cache"
 	k8sclientcmd "k8s.io/client-go/tools/clientcmd"
+
+	// k8swatch "k8s.io/apimachinery/pkg/watch"
 )
 
 // Operator manages NATS Clusters running in Kubernetes.
