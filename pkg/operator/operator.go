@@ -172,7 +172,7 @@ func (op *Operator) RegisterCRD(context.Context) error {
 
 	// Create the CRD if it does not exists.
 	crdc := op.kcrdc.ApiextensionsV1beta1().CustomResourceDefinitions()
-	if _, err := crdc.Create(NATSClusterCRD()); err != nil && !k8sapierrors.IsAlreadyExists(err) {
+	if _, err := crdc.Create(DefaultNATSClusterCRD); err != nil && !k8sapierrors.IsAlreadyExists(err) {
 		return err
 	}
 	op.Noticef("CRD created successfully")
@@ -216,61 +216,4 @@ func (op *Operator) RegisterCRD(context.Context) error {
 	}
 
 	return nil
-}
-
-// NATSClusterCRD returns a representation of the CRD to register.
-func NATSClusterCRD() *k8sapiextensionsv1beta1.CustomResourceDefinition {
-	return &k8sapiextensionsv1beta1.CustomResourceDefinition{
-		// ---
-		// apiVersion: apiextensions.k8s.io/v1beta1
-		// kind: CustomResourceDefinition
-		// ...
-		TypeMeta: k8smetav1.TypeMeta{
-			APIVersion: "apiextensions.k8s.io/v1beta1",
-			Kind:       "CustomResourceDefinition",
-		},
-		// metadata:
-		//   # name must match the spec fields below, and be
-		//   # in the form: <plural>.<group>
-		//   name: natsclusters.messaging.nats.io
-		ObjectMeta: k8smetav1.ObjectMeta{
-			Name: CRDObjectFullName,
-		},
-		Spec: k8sapiextensionsv1beta1.CustomResourceDefinitionSpec{
-			// # group name to use for REST API: /apis/<group>/<version>
-			// group: messaging.nats.io
-			//
-			// # version name to use for REST API: /apis/<group>/<version>
-			// version: v1alpha2
-			//
-			// # either Namespaced or Cluster
-			// scope: Namespaced
-			Group:   APIGroup,
-			Version: APIVersion,
-
-			// FIXME: Eventually be able to support all cluster.
-			Scope: k8sapiextensionsv1beta1.ResourceScope("Namespaced"),
-			Names: k8sapiextensionsv1beta1.CustomResourceDefinitionNames{
-				// # plural name to be used in the
-				// # URL:
-				// # /apis/<group>/<version>/<plural>
-				// plural: natsclusters
-				Plural: CRDObjectPluralName,
-
-				// # singular name to be used as an
-				// # alias on the CLI and for display
-				// singular: natscluster
-				Singular: CRDObjectName,
-
-				// # kind is normally the CamelCased singular type.
-				// kind: NatsCluster
-				Kind: CRDObjectKindName,
-
-				// # shortNames allow shorter string
-				// # to match your resource on the CLI
-				// - shortNames: ["nats"]
-				ShortNames: []string{"nats"},
-			},
-		},
-	}
 }
