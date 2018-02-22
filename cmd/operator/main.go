@@ -85,10 +85,10 @@ func main() {
 		for sig := range c {
 			op.Debugf("Trapped '%v' signal", sig)
 
-			// If main context already done, then just exit.
+			// If main context already done, then just skip
 			select {
 			case <-ctx.Done():
-				return
+				continue
 			default:
 			}
 
@@ -98,13 +98,15 @@ func main() {
 				os.Exit(0)
 				return
 			case syscall.SIGTERM:
-				// Gracefully shutdown the component,
+				// Gracefully shutdown the operator.  This blocks
+				// until all controllers have stopped running.
 				op.Shutdown()
+				return
 			}
 		}
 	}()
 
-	// Run until the context is canceled.
+	// Run until the context is canceled when quit is called.
 	err = op.Run(ctx)
 	if err != nil && err != context.Canceled {
 		op.Errorf(err.Error())

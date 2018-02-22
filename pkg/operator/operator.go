@@ -3,18 +3,13 @@ package natsoperator
 
 import (
 	"context"
-	"fmt"
-	"net/http"
 	"os"
-	"time"
+	"sync"
 
 	// k8sapiv1 "k8s.io/api/core/v1"
-	k8sapiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+
 	k8scrdclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	k8sapierrors "k8s.io/apimachinery/pkg/api/errors"
-	k8smetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sfields "k8s.io/apimachinery/pkg/fields"
-	k8swaitutil "k8s.io/apimachinery/pkg/util/wait"
 	k8sclient "k8s.io/client-go/kubernetes"
 	k8srestapi "k8s.io/client-go/rest"
 	k8scache "k8s.io/client-go/tools/cache"
@@ -27,9 +22,13 @@ import (
 
 // Operator manages NATS Clusters running in Kubernetes.
 type Operator struct {
+	sync.Mutex
+	wg sync.WaitGroup
+
 	// Start/Stop cancellation.
 	ctx  context.Context
 	quit func()
+	done <-chan struct{}
 
 	// Logging Options.
 	logger Logger
@@ -47,7 +46,12 @@ type Operator struct {
 	ns string
 
 	// Kubernetes Pod Name.
+	// TODO: Not needed?
 	podname string
+
+	// clusters that the operator is managing.
+	// ["namespace"]["name"]NatsCluster
+	clusters map[string]map[string]*NatsClusterController
 }
 
 // Run starts the main loop.
@@ -93,6 +97,7 @@ func (op *Operator) Run(ctx context.Context) error {
 
 	// Set up cancellation context for the main loop.
 	ctx, cancelFn := context.WithCancel(ctx)
+	op.done = ctx.Done()
 
 	// Setup connection between the Operator and Kubernetes
 	// and register CRD to make available API group in case
@@ -101,6 +106,7 @@ func (op *Operator) Run(ctx context.Context) error {
 		return err
 	}
 
+	// Subscribe to changes to NatsCluster resources.
 	listWatcher := k8scache.NewListWatchFromClient(
 		// Auto generated client from pkg/apis/nats.io/v1alpha2/types.go
 		ncrdc.NatsV1alpha2().RESTClient(),
@@ -113,107 +119,50 @@ func (op *Operator) Run(ctx context.Context) error {
 		op.ns,
 		k8sfields.Everything(),
 	)
-
 	_, informer := k8scache.NewIndexerInformer(listWatcher, &natscrdv1alpha2.NatsCluster{}, 0, k8scache.ResourceEventHandlerFuncs{
-		AddFunc: func(natsClusterObject interface{}) {
-			op.Tracef("New NATS Cluster: %+v", natsClusterObject)
+		AddFunc: func(o interface{}) {
+			op.processAdd(ctx, o)
 		},
-		UpdateFunc: func(natsClusterObject interface{}, new interface{}) {
-			op.Tracef("Updated NATS Cluster: %+v", natsClusterObject)
+		UpdateFunc: func(o interface{}, n interface{}) {
+			op.processUpdate(ctx, o, n)
 		},
-		DeleteFunc: func(natsClusterObject interface{}) {
-			op.Tracef("Deleted NATS Cluster: %+v", natsClusterObject)
+		DeleteFunc: func(o interface{}) {
+			op.processDelete(ctx, o)
 		},
 	}, k8scache.Indexers{})
 
-	// FIXME: Ideally should be context here but the `informer`
-	// takes a channel instead :/
-	informerStopCh := make(chan struct{})
-
-	// Release all resources on shutdown.
+	// Signal cancellation of the main context.
 	op.quit = func() {
-		close(informerStopCh)
 		cancelFn()
 	}
 
-	// FIXME: Use waitgroup since awaiting for various goroutines now.
-	go informer.Run(informerStopCh)
+	// Stops running until the context is canceled,
+	// which should only happen when op.Shutdown is called.
+	informer.Run(ctx.Done())
 
-	// Wait until context is done.
-	for {
-		select {
-		case <-ctx.Done():
-			op.Noticef("Bye!")
-			return ctx.Err()
-		}
-	}
+	return ctx.Err()
 }
 
 // Shutdown gracefully shuts down the server.
 func (op *Operator) Shutdown() {
 	op.Noticef("Shutting down...")
 
-	// TODO: Add wait for goroutines to wrap up
+	op.Lock()
+	clusters := op.clusters
+	op.Unlock()
 
-	// Cancel main context to signal exit
+	// Signal stop of all clusters in each namespace asynchronously.
+	for _, clustersInNamespace := range clusters {
+		for _, cluster := range clustersInNamespace {
+			go cluster.Stop()
+		}
+	}
+
+	// Block until all controllers have stopped.
+	op.wg.Wait()
+
+	// Cancel main context to signal exit.
 	op.quit()
-}
 
-// RegisterCRD confirms that the operator can dial into the
-// Kubernetes API Server and creates the CRDs in case not currently
-// present.
-func (op *Operator) RegisterCRD(context.Context) error {
-	// Ping the server and bail already if there is no connectivity.
-	v, err := op.kc.Discovery().ServerVersion()
-	if err != nil {
-		return err
-	}
-	op.Noticef("Running on Kubernetes Cluster %v", v)
-
-	// Create the CRD if it does not exists.
-	crdc := op.kcrdc.ApiextensionsV1beta1().CustomResourceDefinitions()
-	if _, err := crdc.Create(DefaultNATSClusterCRD); err != nil && !k8sapierrors.IsAlreadyExists(err) {
-		return err
-	}
-	op.Noticef("CRD created successfully")
-
-	// Wait for CRD to be ready.
-	err = k8swaitutil.Poll(3*time.Second, 10*time.Minute, func() (bool, error) {
-		result, err := op.kcrdc.ApiextensionsV1beta1().CustomResourceDefinitions().Get(
-			CRDObjectFullName,
-			k8smetav1.GetOptions{},
-		)
-		if err != nil {
-			if se, ok := err.(*k8sapierrors.StatusError); ok {
-				if se.Status().Code == http.StatusNotFound {
-					return false, nil
-				}
-			}
-			return false, err
-		}
-
-		// Confirm that the CRD condition has converged
-		// to the 'established' state.
-		for _, cond := range result.Status.Conditions {
-			switch cond.Type {
-			case k8sapiextensionsv1beta1.Established:
-				if cond.Status == k8sapiextensionsv1beta1.ConditionTrue {
-					return true, nil
-				}
-			case k8sapiextensionsv1beta1.NamesAccepted:
-				if cond.Status == k8sapiextensionsv1beta1.ConditionFalse {
-					return false, fmt.Errorf("Name conflict: %v", cond.Reason)
-				}
-			}
-		}
-
-		return true, nil
-	})
-	if err != nil {
-		op.Errorf("Gave up waiting for CRD to be ready: %s", err)
-	} else {
-		op.Noticef("CRD is ready")
-	}
-
-	return nil
+	op.Noticef("Bye...")
 }

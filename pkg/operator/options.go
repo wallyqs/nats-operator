@@ -7,7 +7,10 @@ type Option func(*Operator) error
 // NewOperator takes a variadic set of options and
 // returns a configured operator.
 func NewOperator(options ...Option) (*Operator, error) {
-	op := &Operator{}
+	clusters := make(map[string]map[string]*NatsClusterController)
+	op := &Operator{
+		clusters: clusters,
+	}
 
 	// Apply customizations and error out in case
 	// any of each are invalid.
