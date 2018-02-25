@@ -34,4 +34,10 @@ const (
 
 	// ContainerName is the name of the NATS server container.
 	ContainerName = "nats-server"
+
+	// Labels for the pod
+	LabelAppKey            = "app"
+	LabelAppValue          = "nats"
+	LabelClusterNameKey    = "natsCluster"
+	LabelClusterVersionKey = "natsVersion"
 )

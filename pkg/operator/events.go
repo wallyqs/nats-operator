@@ -6,23 +6,24 @@ import (
 	"time"
 
 	natscrdv1alpha2 "github.com/nats-io/nats-kubernetes/operators/nats-server/pkg/apis/nats.io/v1alpha2"
+	k8sv1 "k8s.io/api/core/v1"
 )
 
-// processAddedCluster...
+// processAdd
 func (op *Operator) processAdd(ctx context.Context, o interface{}) {
 	config := o.(*natscrdv1alpha2.NatsCluster)
 	op.Tracef("Adding NATS Cluster: %+v", config)
 
 	controller := &NatsClusterController{
-		config:    config,
-		logger:    op.logger,
-		debug:     op.debug,
-		trace:     op.trace,
-		namespace: config.Namespace,
-		name:      config.Name,
-		done:      make(chan struct{}),
-		pods:      make(map[string]interface{}),
-		kc:        op.kc,
+		config:      config,
+		logger:      op.logger,
+		debug:       op.debug,
+		trace:       op.trace,
+		namespace:   config.Namespace,
+		clusterName: config.Name,
+		done:        make(chan struct{}),
+		pods:        make(map[string]*k8sv1.Pod),
+		kc:          op.kc,
 	}
 
 	op.Lock()
@@ -63,7 +64,7 @@ func (op *Operator) processAdd(ctx context.Context, o interface{}) {
 	go controller.Run(ctx)
 }
 
-// processClusterUpdate...
+// processUpdate
 func (op *Operator) processUpdate(ctx context.Context, o interface{}, n interface{}) {
 	oldc := o.(*natscrdv1alpha2.NatsCluster)
 	newc := n.(*natscrdv1alpha2.NatsCluster)
@@ -74,7 +75,7 @@ func (op *Operator) processUpdate(ctx context.Context, o interface{}, n interfac
 	// TODO: Enable other options.
 }
 
-// processDeletedCluster...
+// processDelete
 func (op *Operator) processDelete(ctx context.Context, o interface{}) {
 	config := o.(*natscrdv1alpha2.NatsCluster)
 	op.Tracef("Deleting NATS Cluster: %+v", config)
