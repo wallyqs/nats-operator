@@ -26,4 +26,12 @@ const (
 	// CRDObjectFullName
 	// e.g. natsclusters.messaging.nats.io
 	CRDObjectFullName = CRDObjectPluralName + "." + APIGroup
+
+	// Ports
+	ClientPort     = int32(4222)
+	ClusterPort    = int32(6222)
+	MonitoringPort = int32(8222)
+
+	// ContainerName is the name of the NATS server container.
+	ContainerName = "nats-server"
 )

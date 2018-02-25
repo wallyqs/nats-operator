@@ -28,7 +28,6 @@ type Operator struct {
 	// Start/Stop cancellation.
 	ctx  context.Context
 	quit func()
-	done <-chan struct{}
 
 	// Logging Options.
 	logger Logger
@@ -97,7 +96,6 @@ func (op *Operator) Run(ctx context.Context) error {
 
 	// Set up cancellation context for the main loop.
 	ctx, cancelFn := context.WithCancel(ctx)
-	op.done = ctx.Done()
 
 	// Setup connection between the Operator and Kubernetes
 	// and register CRD to make available API group in case

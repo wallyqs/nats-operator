@@ -14,13 +14,15 @@ func (op *Operator) processAdd(ctx context.Context, o interface{}) {
 	op.Tracef("Adding NATS Cluster: %+v", config)
 
 	controller := &NatsClusterController{
-		crd:       config,
+		config:    config,
 		logger:    op.logger,
 		debug:     op.debug,
 		trace:     op.trace,
 		namespace: config.Namespace,
 		name:      config.Name,
 		done:      make(chan struct{}),
+		pods:      make(map[string]interface{}),
+		kc:        op.kc,
 	}
 
 	op.Lock()
@@ -66,10 +68,16 @@ func (op *Operator) processUpdate(ctx context.Context, o interface{}, n interfac
 	oldc := o.(*natscrdv1alpha2.NatsCluster)
 	newc := n.(*natscrdv1alpha2.NatsCluster)
 	op.Tracef("Updating NATS Cluster: Old: %+v || New: %+v", oldc, newc)
+
+	// TODO: Confirm which fields should this handle, probably
+	// cluster size would be updated in order to scale up/down.
+	// TODO: Enable other options.
 }
 
 // processDeletedCluster...
 func (op *Operator) processDelete(ctx context.Context, o interface{}) {
 	config := o.(*natscrdv1alpha2.NatsCluster)
 	op.Tracef("Deleting NATS Cluster: %+v", config)
+
+	// TODO: Should stop the controller and delete the managed pods.
 }
