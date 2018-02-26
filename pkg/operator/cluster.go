@@ -3,6 +3,7 @@ package natsoperator
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -72,11 +73,14 @@ func (ncc *NatsClusterController) Run(ctx context.Context) error {
 	return ctx.Err()
 }
 
+// FIXME: Should include context internally in the client-go requests to
+// timeout and cancel the inflight requests...
 func (ncc *NatsClusterController) createPods(ctx context.Context) error {
 	ncc.Debugf("Creating pods for NATS cluster")
 
 	size := int(*ncc.config.Spec.Size)
 	pods := make([]*k8sv1.Pod, size)
+	routes := make([]string, size)
 	for i := 0; i < size; i++ {
 		// Generate a stable unique name for each one of the pods.
 		name := GeneratePodName(ncc.clusterName)
@@ -105,40 +109,77 @@ func (ncc *NatsClusterController) createPods(ctx context.Context) error {
 			},
 		}
 		pods[i] = pod
+		routes[i] = fmt.Sprintf("%s")
 	}
 
-	// FIXME: Should include context internally too timeout and cancel
-	// the requests...
-	// routes := ""
-	// for _, pod := range pods {
-	// 	// Include volumes
-	// 	// Include the ConfigMap volume for each one of the pods.
-	// }
+	// Create the config map which will be the mounted file
 	configMap := &k8sv1.ConfigMap{
 		ObjectMeta: k8smetav1.ObjectMeta{
 			Name: ncc.clusterName,
 		},
 		Data: map[string]string{
 			"nats.conf": `
-"http_port": 8222
+"http_port": 8223
+
+"debug": true
+
+"cluster": {
+  "routes": [
+    "nats://127.0.0.1:6222"
+  ]
+}
 `,
 		},
 	}
-	result, err := ncc.kc.CoreV1().ConfigMaps(ncc.namespace).Create(configMap)
-	if err != nil {
+
+	if result, err := ncc.kc.CoreV1().ConfigMaps(ncc.namespace).Create(configMap); err != nil {
 		ncc.Errorf("Could not create config map: %s", err)
+	} else {
+		ncc.configMap = result
 	}
-	ncc.configMap = result
 
-	// result, err := ncc.kc.CoreV1().Pods(ncc.namespace).Create(pod)
-	// if err != nil {
-	// 	ncc.Errorf("Could not create pod: %s", err)
-	// }
-	// ncc.Lock()
-	// ncc.pods[pod.Name] = result
-	// ncc.Unlock()
+	// TODO Should wait for the config map to be created as well?
 
-	// ncc.Noticef("Created Pod: %+v", result)
+	// TODO: Config map (make helper method)
+	for _, pod := range pods {
+		// For the Pod
+		volumeName := "config"
+		configVolume := k8sv1.Volume{
+			Name: volumeName,
+			VolumeSource: k8sv1.VolumeSource{
+				ConfigMap: &k8sv1.ConfigMapVolumeSource{
+					LocalObjectReference: k8sv1.LocalObjectReference{
+						Name: ncc.clusterName,
+					},
+				},
+			},
+		}
+		// For the Container
+		configVolumeMount := k8sv1.VolumeMount{
+			Name:      volumeName,
+			MountPath: "/etc/nats-config",
+		}
+		volumeMounts := []k8sv1.VolumeMount{configVolumeMount}
+
+		// Include the ConfigMap volume for each one of the pods.
+		pod.Spec.Volumes = []k8sv1.Volume{
+			configVolume,
+		}
+
+		// Include the volume as part of the mount list for the NATS container.
+		container := pod.Spec.Containers[0]
+		container.VolumeMounts = volumeMounts
+		pod.Spec.Containers[0] = container
+		result, err := ncc.kc.CoreV1().Pods(ncc.namespace).Create(pod)
+		if err != nil {
+			ncc.Errorf("Could not create pod: %s", err)
+		}
+		ncc.Lock()
+		ncc.pods[pod.Name] = result
+		ncc.Unlock()
+
+		ncc.Noticef("Created Pod: %+v", result)
+	}
 
 	return nil
 }
