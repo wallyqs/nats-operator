@@ -40,4 +40,8 @@ const (
 	LabelAppValue          = "nats"
 	LabelClusterNameKey    = "natsCluster"
 	LabelClusterVersionKey = "natsVersion"
+
+	// ConfigMapMountPath is the path on which the shared config map
+	// for the NATS cluster will be.
+	ConfigMapMountPath = "/etc/nats-config"
 )

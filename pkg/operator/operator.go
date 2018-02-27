@@ -5,19 +5,14 @@ import (
 	"context"
 	"os"
 	"sync"
+	"time"
 
-	// k8sapiv1 "k8s.io/api/core/v1"
-
+	natscrdclient "github.com/nats-io/nats-kubernetes/operators/nats-server/pkg/generated/versioned"
 	k8scrdclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	k8sfields "k8s.io/apimachinery/pkg/fields"
 	k8sclient "k8s.io/client-go/kubernetes"
 	k8srestapi "k8s.io/client-go/rest"
 	k8scache "k8s.io/client-go/tools/cache"
 	k8sclientcmd "k8s.io/client-go/tools/clientcmd"
-
-	// k8swatch "k8s.io/apimachinery/pkg/watch"
-	natscrdv1alpha2 "github.com/nats-io/nats-kubernetes/operators/nats-server/pkg/apis/nats.io/v1alpha2"
-	natscrdclient "github.com/nats-io/nats-kubernetes/operators/nats-server/pkg/generated/versioned"
 )
 
 // Operator manages NATS Clusters running in Kubernetes.
@@ -35,7 +30,9 @@ type Operator struct {
 	trace  bool
 
 	// Kubernetes API clients.
-	kc    k8sclient.Interface
+	kc k8sclient.Interface
+
+	// Kubernetes API client for API extensions.
 	kcrdc k8scrdclient.Interface
 
 	// NATS operator client.
@@ -45,7 +42,7 @@ type Operator struct {
 	ns string
 
 	// Kubernetes Pod Name.
-	// TODO: Not needed?
+	// FIXME: Not needed?
 	podname string
 
 	// clusters that the operator is managing.
@@ -71,28 +68,13 @@ func (op *Operator) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
-	kc, err := k8sclient.NewForConfig(cfg)
-	if err != nil {
-		return err
-	}
-	op.kc = kc
-
-	kcrdc, err := k8scrdclient.NewForConfig(cfg)
-	if err != nil {
-		return err
-	}
-	op.kcrdc = kcrdc
-
-	// Get config for the NATS clusters.
-	ncrdc, err := natscrdclient.NewForConfig(cfg)
-	if err != nil {
+	if err := op.ConfigureKubernetesRESTClients(cfg); err != nil {
 		return err
 	}
 
 	op.Debugf("Kubernetes Cluster Config: %+v", cfg)
-	op.Debugf("Kubernetes Client: %+v", kc)
-	op.Debugf("Kubernetes Extensions Client: %+v", kcrdc)
+	op.Debugf("Kubernetes Client: %+v", op.kc)
+	op.Debugf("Kubernetes Extensions Client: %+v", op.kcrdc)
 
 	// Set up cancellation context for the main loop.
 	ctx, cancelFn := context.WithCancel(ctx)
@@ -105,19 +87,7 @@ func (op *Operator) Run(ctx context.Context) error {
 	}
 
 	// Subscribe to changes to NatsCluster resources.
-	listWatcher := k8scache.NewListWatchFromClient(
-		// Auto generated client from pkg/apis/nats.io/v1alpha2/types.go
-		ncrdc.NatsV1alpha2().RESTClient(),
-
-		// "natsclusters"
-		CRDObjectPluralName,
-
-		// Namespace where the NATS clusters are created.
-		// TODO: Consider cluster wide option here?
-		op.ns,
-		k8sfields.Everything(),
-	)
-	_, informer := k8scache.NewIndexerInformer(listWatcher, &natscrdv1alpha2.NatsCluster{}, 0, k8scache.ResourceEventHandlerFuncs{
+	_, controller := NewNatsClusterResourcesInformer(op, k8scache.ResourceEventHandlerFuncs{
 		AddFunc: func(o interface{}) {
 			op.processAdd(ctx, o)
 		},
@@ -127,7 +97,7 @@ func (op *Operator) Run(ctx context.Context) error {
 		DeleteFunc: func(o interface{}) {
 			op.processDelete(ctx, o)
 		},
-	}, k8scache.Indexers{})
+	}, 30*time.Second)
 
 	// Signal cancellation of the main context.
 	op.quit = func() {
@@ -136,7 +106,7 @@ func (op *Operator) Run(ctx context.Context) error {
 
 	// Stops running until the context is canceled,
 	// which should only happen when op.Shutdown is called.
-	informer.Run(ctx.Done())
+	controller.Run(ctx.Done())
 
 	return ctx.Err()
 }

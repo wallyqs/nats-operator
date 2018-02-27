@@ -7,7 +7,6 @@ import (
 	"fmt"
 )
 
-// ServerConfig...
 type ServerConfig struct {
 	Host           string               `json:"host,omitempty"`
 	Port           int                  `json:"port,omitempty"`
@@ -23,9 +22,10 @@ type ServerConfig struct {
 }
 
 type ClusterConfig struct {
-	Port   int        `json:"port,omitempty"`
-	Routes []string   `json:"routes,omitempty"`
-	TLS    *TLSConfig `json:"tls,omitempty"`
+	Port          int                  `json:"port,omitempty"`
+	Routes        []string             `json:"routes,omitempty"`
+	TLS           *TLSConfig           `json:"tls,omitempty"`
+	Authorization *AuthorizationConfig `json:"authorization,omitempty"`
 }
 
 type TLSConfig struct {
@@ -35,14 +35,14 @@ type TLSConfig struct {
 	Verify           bool     `json:"verify,omitempty"`
 	CipherSuites     []string `json:"cipher_suites,omitempty"`
 	CurvePreferences []string `json:"curve_preferences,omitempty"`
-	Timeout          *float64 `json:"timeout,omitempty"`
+	Timeout          float64  `json:"timeout,omitempty"`
 }
 
 type AuthorizationConfig struct {
 	Username string `json:"username,omitempty"`
 	Password string `json:"password,omitempty"`
 	Token    string `json:"token,omitempty"`
-	Timeout  *int   `json:"timeout,omitempty"`
+	Timeout  int    `json:"timeout,omitempty"`
 }
 
 func Marshal(conf *ServerConfig) ([]byte, error) {
