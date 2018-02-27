@@ -10,6 +10,11 @@ spec:
   template:
     spec:
       containers:
-      - args: ["-D", "-V"]
+      - args:
+        - "-D"
+        - "-V"
+        # How often the operator will monitor for missing pods
+        # and replace them with new ones (seconds).
+        # -reconcile_interval=10
         image: wallyqs/nats-server-operator:latest
         name: nats-server-operator

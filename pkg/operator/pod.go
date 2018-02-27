@@ -63,10 +63,10 @@ func NewNatsRoutesService(clusterName string) (*k8sv1.Service, error) {
 				"app":         "nats",
 				"natsCluster": clusterName,
 			},
-			// TODO: Annotations,
 		},
 		Spec: k8sv1.ServiceSpec{
 			Ports: ports,
+			PublishNotReadyAddresses: true,
 			Selector: map[string]string{
 				"app":         "nats",
 				"natsCluster": clusterName,
@@ -96,10 +96,10 @@ func NewNatsClientsService(clusterName string) (*k8sv1.Service, error) {
 				"app":         "nats",
 				"natsCluster": clusterName,
 			},
-			// TODO: Annotations,
 		},
 		Spec: k8sv1.ServiceSpec{
 			Ports: ports,
+			PublishNotReadyAddresses: true,
 			Selector: map[string]string{
 				"app":         "nats",
 				"natsCluster": clusterName,
