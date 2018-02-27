@@ -35,13 +35,21 @@ const (
 	// ContainerName is the name of the NATS server container.
 	ContainerName = "nats-server"
 
-	// Labels for the pod
+	// Labels for the Pod.
 	LabelAppKey            = "app"
 	LabelAppValue          = "nats"
 	LabelClusterNameKey    = "natsCluster"
 	LabelClusterVersionKey = "natsVersion"
 
-	// ConfigMapMountPath is the path on which the shared config map
-	// for the NATS cluster will be.
+	// ConfigMapMountPath is the path on which the shared ConfigMap
+	// for the NATS cluster will be located.
 	ConfigMapMountPath = "/etc/nats-config"
+
+	// ServerCertsMountPath is the path where the server certificates
+	// to secure clients connections are located.
+	ServerCertsMountPath = "/etc/nats-server-tls-certs"
+
+	// RoutesCertsMountPath is the path where the certificates
+	// to secure routes connections are located.
+	RoutesCertsMountPath = "/etc/nats-routes-tls-certs"
 )

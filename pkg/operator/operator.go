@@ -86,7 +86,8 @@ func (op *Operator) Run(ctx context.Context) error {
 		return err
 	}
 
-	// Subscribe to changes to NatsCluster resources.
+	// Subscribe to changes on NatsCluster resources.
+	// FIXME: Make interval tunable here.
 	_, controller := NewNatsClusterResourcesInformer(op, k8scache.ResourceEventHandlerFuncs{
 		AddFunc: func(o interface{}) {
 			op.processAdd(ctx, o)

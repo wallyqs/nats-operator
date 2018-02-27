@@ -29,9 +29,9 @@ type ClusterConfig struct {
 }
 
 type TLSConfig struct {
+	CAFile           string   `json:"ca_file,omitempty"`
 	CertFile         string   `json:"cert_file,omitempty"`
 	KeyFile          string   `json:"key_file,omitempty"`
-	CAFile           string   `json:"ca_file,omitempty"`
 	Verify           bool     `json:"verify,omitempty"`
 	CipherSuites     []string `json:"cipher_suites,omitempty"`
 	CurvePreferences []string `json:"curve_preferences,omitempty"`

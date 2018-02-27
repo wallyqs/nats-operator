@@ -3,12 +3,10 @@ package natsoperator
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
 	natscrdv1alpha2 "github.com/nats-io/nats-kubernetes/operators/nats-server/pkg/apis/nats.io/v1alpha2"
-	natsconf "github.com/nats-io/nats-kubernetes/operators/nats-server/pkg/conf"
 	k8sv1 "k8s.io/api/core/v1"
 	k8smetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sclient "k8s.io/client-go/kubernetes"
@@ -55,6 +53,7 @@ func (ncc *NatsClusterController) Run(ctx context.Context) error {
 	// Create headless service for the set of pods, then another
 	// one for the clients.
 	if err := ncc.createServices(ctx); err != nil {
+		ncc.Errorf("Error during the creation of required services: %s", err)
 		return err
 	}
 
@@ -62,7 +61,7 @@ func (ncc *NatsClusterController) Run(ctx context.Context) error {
 	// creation fails in this step then eventually reconcile
 	// should try to do it.
 	if err := ncc.createPods(ctx); err != nil {
-		// return err
+		ncc.Errorf("Error during the creation of first set of pods: %s", err)
 	}
 
 	// Periodically check health of the NATS cluster against
@@ -86,19 +85,13 @@ func (ncc *NatsClusterController) Run(ctx context.Context) error {
 func (ncc *NatsClusterController) createServices(ctx context.Context) error {
 	ncc.Debugf("Creating services")
 
-	svc, err := NewNatsRoutesService(ncc.clusterName)
-	if err != nil {
-		return err
-	}
-	_, err = ncc.kc.CoreV1().Services(ncc.namespace).Create(svc)
+	svc := NewNatsRoutesService(ncc.clusterName)
+	_, err := ncc.kc.CoreV1().Services(ncc.namespace).Create(svc)
 	if err != nil {
 		ncc.Errorf("Warning: error creating service: %s", err)
 	}
 
-	svc, err = NewNatsClientsService(ncc.clusterName)
-	if err != nil {
-		return err
-	}
+	svc = NewNatsClientsService(ncc.clusterName)
 	_, err = ncc.kc.CoreV1().Services(ncc.namespace).Create(svc)
 	if err != nil {
 		ncc.Errorf("Warning: error creating service: %s", err)
@@ -115,8 +108,8 @@ func (ncc *NatsClusterController) createPods(ctx context.Context) error {
 	pods := make([]*k8sv1.Pod, size)
 	routes := make([]string, size)
 	for i := 0; i < size; i++ {
-		// Generate a stable unique name for each one of the pods.
-		name := GeneratePodName(ncc.clusterName)
+		// TODO: Allow stable names option as well?
+		name := UniquePodName(ncc.clusterName)
 
 		pod := &k8sv1.Pod{
 			ObjectMeta: k8smetav1.ObjectMeta{
@@ -132,7 +125,7 @@ func (ncc *NatsClusterController) createPods(ctx context.Context) error {
 				// Hostname+Subdomain required in order to properly
 				// assemble the cluster using A records later on.
 				Hostname:  name,
-				Subdomain: fmt.Sprintf("%s-routes", ncc.clusterName),
+				Subdomain: RoutesServiceSubdomain(ncc.clusterName),
 				Containers: []k8sv1.Container{
 					NewNatsContainer(ncc.config.Spec.Version),
 				},
@@ -145,48 +138,27 @@ func (ncc *NatsClusterController) createPods(ctx context.Context) error {
 		//
 		// $name.$clusterName.$namespace.svc.cluster.local
 		//
-		routes[i] = fmt.Sprintf("%s.%s-routes.%s.svc",
-			name, ncc.clusterName, ncc.namespace)
+		routes[i] = NatsClusterRouteURL(name, ncc.clusterName, ncc.namespace)
 	}
 
-	// Create the shared configuration
-	sconfig := &natsconf.ServerConfig{
-		Port:     int(ClientPort),
-		HTTPPort: int(MonitoringPort),
-		Debug:    true,
-		Trace:    true,
-		Cluster: &natsconf.ClusterConfig{
-			Port:   int(ClusterPort),
-			Routes: routes,
-		},
-	}
-	rawConfig, err := natsconf.Marshal(sconfig)
+	// Create the shared ConfigMap for the pods.
+	configMap, err := NewNatsClusterConfigMap(ncc, pods, routes)
 	if err != nil {
 		return err
 	}
-
-	// Create the config map which will be the mounted file.
-	configMap := &k8sv1.ConfigMap{
-		ObjectMeta: k8smetav1.ObjectMeta{
-			Name: ncc.clusterName,
-		},
-		Data: map[string]string{
-			"nats.conf": string(rawConfig),
-		},
-	}
-
-	if result, err := ncc.kc.CoreV1().ConfigMaps(ncc.namespace).Create(configMap); err != nil {
-		ncc.Errorf("Could not create config map: %s", err)
+	result, err := ncc.kc.CoreV1().ConfigMaps(ncc.namespace).Create(configMap)
+	if err != nil {
+		return err
 	} else {
 		ncc.configMap = result
 	}
+	// TODO: Should it wait for the config map to be created?
 
-	// TODO: Should it wait for the config map to be created as well?
 	for _, pod := range pods {
-		// Check if TLS was enabled in the pod
-		ncc.Debugf("TLS was enabled: %+v", ncc.config.Spec.TLS)
+		volumes := make([]k8sv1.Volume, 0)
+		volumeMounts := make([]k8sv1.VolumeMount, 0)
 
-		// For the Pod
+		// ConfigMap: Volume declaration for the Pod.
 		volumeName := "config"
 		configVolume := k8sv1.Volume{
 			Name: volumeName,
@@ -198,30 +170,36 @@ func (ncc *NatsClusterController) createPods(ctx context.Context) error {
 				},
 			},
 		}
+		volumes = append(volumes, configVolume)
 
-		// For the Container
+		// ConfigMap: VolumeMount declaration for the Container.
 		configVolumeMount := k8sv1.VolumeMount{
 			Name:      volumeName,
 			MountPath: ConfigMapMountPath,
 		}
+		volumeMounts = append(volumeMounts, configVolumeMount)
 
-		// TODO: In case TLS was enabled as part of the NATS cluster configuration
-		// then should include the configuration here.
-		volumeMounts := []k8sv1.VolumeMount{configVolumeMount}
-
-		// Include the ConfigMap volume for each one of the pods.
-		pod.Spec.Volumes = []k8sv1.Volume{
-			configVolume,
+		// In case TLS was enabled as part of the NATS cluster
+		// configuration then should include the configuration here.
+		if ncc.config.Spec.TLS != nil {
+			ncc.Debugf("TLS is enabled. Adding cert volumes: %+v", ncc.config.Spec.TLS)
+			// TODO
 		}
 
-		// Include the volume as part of the mount list for the NATS container.
+		// Update the volumes mounts list from the NATS container
+		// then create the pod.
+		pod.Spec.Volumes = volumes
 		container := pod.Spec.Containers[0]
 		container.VolumeMounts = volumeMounts
 		pod.Spec.Containers[0] = container
 
+		// Create the configured pod.
 		result, err := ncc.kc.CoreV1().Pods(ncc.namespace).Create(pod)
 		if err != nil {
 			ncc.Errorf("Could not create pod: %s", err)
+
+			// Skip creating this pod
+			continue
 		}
 		ncc.Lock()
 		ncc.pods[pod.Name] = result
