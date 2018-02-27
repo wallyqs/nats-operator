@@ -148,7 +148,7 @@ func (ncc *NatsClusterController) createPods(ctx context.Context) error {
 	}
 	result, err := ncc.kc.CoreV1().ConfigMaps(ncc.namespace).Create(configMap)
 	if err != nil {
-		return err
+		ncc.Errorf("error creating configmap: %s", err)
 	} else {
 		ncc.configMap = result
 	}
@@ -158,32 +158,30 @@ func (ncc *NatsClusterController) createPods(ctx context.Context) error {
 		volumes := make([]k8sv1.Volume, 0)
 		volumeMounts := make([]k8sv1.VolumeMount, 0)
 
-		// ConfigMap: Volume declaration for the Pod.
-		volumeName := "config"
-		configVolume := k8sv1.Volume{
-			Name: volumeName,
-			VolumeSource: k8sv1.VolumeSource{
-				ConfigMap: &k8sv1.ConfigMapVolumeSource{
-					LocalObjectReference: k8sv1.LocalObjectReference{
-						Name: ncc.clusterName,
-					},
-				},
-			},
-		}
-		volumes = append(volumes, configVolume)
-
-		// ConfigMap: VolumeMount declaration for the Container.
-		configVolumeMount := k8sv1.VolumeMount{
-			Name:      volumeName,
-			MountPath: ConfigMapMountPath,
-		}
-		volumeMounts = append(volumeMounts, configVolumeMount)
+		// ConfigMap: Volume declaration for the Pod and Container.
+		volume := NewConfigMapVolume(ncc.clusterName)
+		volumes = append(volumes, volume)
+		volumeMount := NewConfigMapVolumeMount()
+		volumeMounts = append(volumeMounts, volumeMount)
 
 		// In case TLS was enabled as part of the NATS cluster
 		// configuration then should include the configuration here.
 		if ncc.config.Spec.TLS != nil {
-			ncc.Debugf("TLS is enabled. Adding cert volumes: %+v", ncc.config.Spec.TLS)
-			// TODO
+			if ncc.config.Spec.TLS.ServerSecret != "" {
+				volume = NewServerSecretVolume(ncc.config.Spec.TLS.ServerSecret)
+				volumes = append(volumes, volume)
+
+				volumeMount := NewServerSecretVolumeMount()
+				volumeMounts = append(volumeMounts, volumeMount)
+			}
+
+			if ncc.config.Spec.TLS.RoutesSecret != "" {
+				volume = NewRoutesSecretVolume(ncc.config.Spec.TLS.RoutesSecret)
+				volumes = append(volumes, volume)
+
+				volumeMount := NewRoutesSecretVolumeMount()
+				volumeMounts = append(volumeMounts, volumeMount)
+			}
 		}
 
 		// Update the volumes mounts list from the NATS container
@@ -198,14 +196,14 @@ func (ncc *NatsClusterController) createPods(ctx context.Context) error {
 		if err != nil {
 			ncc.Errorf("Could not create pod: %s", err)
 
-			// Skip creating this pod
+			// Skip creating this pod in case it failed.
 			continue
 		}
 		ncc.Lock()
 		ncc.pods[pod.Name] = result
 		ncc.Unlock()
 
-		ncc.Noticef("Created Pod: %+v", result)
+		ncc.Tracef("Created Pod '%s'", pod.Name)
 	}
 
 	return nil

@@ -23,7 +23,7 @@ const (
 	// CRDObjectKindName is the name used for the CRD in the requests payload.
 	CRDObjectKindName = "NatsCluster"
 
-	// CRDObjectFullName
+	// CRDObjectFullName is the name of the API group.
 	// e.g. natsclusters.messaging.nats.io
 	CRDObjectFullName = CRDObjectPluralName + "." + APIGroup
 
@@ -40,6 +40,11 @@ const (
 	LabelAppValue          = "nats"
 	LabelClusterNameKey    = "natsCluster"
 	LabelClusterVersionKey = "natsVersion"
+
+	// Volumes
+	ConfigMapVolumeName    = "config"
+	ServerSecretVolumeName = "server-tls-certs"
+	RoutesSecretVolumeName = "routes-tls-certs"
 
 	// ConfigMapMountPath is the path on which the shared ConfigMap
 	// for the NATS cluster will be located.

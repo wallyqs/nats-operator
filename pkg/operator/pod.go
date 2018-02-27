@@ -58,8 +58,6 @@ func NewNatsRoutesService(clusterName string) *k8sv1.Service {
 
 	return &k8sv1.Service{
 		ObjectMeta: k8smetav1.ObjectMeta{
-			// nats-routes.default.svc.cluster.local
-			// TODO: Modify here
 			Name: RoutesServiceSubdomain(clusterName),
 			Labels: map[string]string{
 				"app":         "nats",
@@ -111,7 +109,7 @@ func NewNatsClientsService(clusterName string) *k8sv1.Service {
 
 // NewNatsClusterConfigMap take the current cluster configuration and
 // then returns the proper config map to be shared by the NATS cluster
-// nodes. Warning: natsconf package is very hacky.
+// nodes. warning: natsconf package is very hacky.
 func NewNatsClusterConfigMap(
 	ncc *NatsClusterController,
 	pods []*k8sv1.Pod,
@@ -130,6 +128,8 @@ func NewNatsClusterConfigMap(
 
 	if ncc.config.Spec.TLS != nil {
 		// FIXME: Allow customizing the path to each one of these.
+		// FIXME: Validate whether the TLS config secret includes these
+		// files before actually trying to use it, can take long to debug.
 		if ncc.config.Spec.TLS.ServerSecret != "" {
 			sconfig.TLS = &natsconf.TLSConfig{
 				CAFile:   ServerCertsMountPath + "/ca.pem",
@@ -137,16 +137,14 @@ func NewNatsClusterConfigMap(
 				KeyFile:  ServerCertsMountPath + "/server-key.pem",
 			}
 		}
-
 		if ncc.config.Spec.TLS.RoutesSecret != "" {
 			sconfig.Cluster.TLS = &natsconf.TLSConfig{
 				CAFile:   RoutesCertsMountPath + "/ca.pem",
-				CertFile: RoutesCertsMountPath + "/routes.pem",
-				KeyFile:  RoutesCertsMountPath + "/routes-key.pem",
+				CertFile: RoutesCertsMountPath + "/route.pem",
+				KeyFile:  RoutesCertsMountPath + "/route-key.pem",
 			}
 		}
 	}
-
 	rawConfig, err := natsconf.Marshal(sconfig)
 	if err != nil {
 		return nil, err
@@ -161,6 +159,62 @@ func NewNatsClusterConfigMap(
 			"nats.conf": string(rawConfig),
 		},
 	}, nil
+}
+
+func NewConfigMapVolume(clusterName string) k8sv1.Volume {
+	return k8sv1.Volume{
+		Name: ConfigMapVolumeName,
+		VolumeSource: k8sv1.VolumeSource{
+			ConfigMap: &k8sv1.ConfigMapVolumeSource{
+				LocalObjectReference: k8sv1.LocalObjectReference{
+					Name: clusterName,
+				},
+			},
+		},
+	}
+}
+
+func NewConfigMapVolumeMount() k8sv1.VolumeMount {
+	return k8sv1.VolumeMount{
+		Name:      ConfigMapVolumeName,
+		MountPath: ConfigMapMountPath,
+	}
+}
+
+func NewServerSecretVolume(secretName string) k8sv1.Volume {
+	return k8sv1.Volume{
+		Name: ServerSecretVolumeName,
+		VolumeSource: k8sv1.VolumeSource{
+			Secret: &k8sv1.SecretVolumeSource{
+				SecretName: secretName,
+			},
+		},
+	}
+}
+
+func NewServerSecretVolumeMount() k8sv1.VolumeMount {
+	return k8sv1.VolumeMount{
+		Name:      ServerSecretVolumeName,
+		MountPath: ServerCertsMountPath,
+	}
+}
+
+func NewRoutesSecretVolume(secretName string) k8sv1.Volume {
+	return k8sv1.Volume{
+		Name: RoutesSecretVolumeName,
+		VolumeSource: k8sv1.VolumeSource{
+			Secret: &k8sv1.SecretVolumeSource{
+				SecretName: secretName,
+			},
+		},
+	}
+}
+
+func NewRoutesSecretVolumeMount() k8sv1.VolumeMount {
+	return k8sv1.VolumeMount{
+		Name:      RoutesSecretVolumeName,
+		MountPath: RoutesCertsMountPath,
+	}
 }
 
 // RoutesServiceSubdomain is the name of the of the service for

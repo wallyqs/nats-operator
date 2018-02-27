@@ -133,5 +133,5 @@ func (op *Operator) Shutdown() {
 	// Cancel main context to signal exit.
 	op.quit()
 
-	op.Noticef("Bye...")
+	op.Noticef("Bye")
 }
