@@ -1,0 +1,10 @@
+apiVersion: "messaging.nats.io/v1alpha2"
+kind: NatsCluster
+metadata:
+  name: nats-sample-cluster
+spec:
+  # Number of nodes in the cluster
+  size: 5
+
+  # Minimum version of the server
+  version: "1.0.4"

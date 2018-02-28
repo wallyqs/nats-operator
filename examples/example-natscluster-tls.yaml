@@ -1,0 +1,20 @@
+apiVersion: "messaging.nats.io/v1alpha2"
+kind: NatsCluster
+metadata:
+  # Name of the cluster under the default namespace
+  name: nats
+spec:
+  # Number of nodes in the cluster
+  size: 3
+
+  # Minimum version of the server
+  version: "1.0.4"
+
+  # Use secrets for the optional TLS configuration.
+  tls:
+    # Certificates to secure the NATS client connections.
+    # ca.pem, server.pem, server-key.pem
+    serverSecret: "nats-clients-tls"
+
+    # Certificates to secure the routes.
+    routesSecret: "nats-routes-tls"
