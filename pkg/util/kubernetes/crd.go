@@ -86,6 +86,7 @@ func readClusterCR(b []byte) (*spec.NatsCluster, error) {
 }
 
 func CreateCRD(clientset apiextensionsclient.Interface) error {
+	// TODO: Register the service role types here
 	crd := &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: spec.CRDName,
@@ -102,6 +103,27 @@ func CreateCRD(clientset apiextensionsclient.Interface) error {
 		},
 	}
 	_, err := clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+	if err != nil {
+		return err
+	}
+
+	// Create the service role type as well...
+	crd = &apiextensionsv1beta1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: spec.ServiceRoleCRDName,
+		},
+		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+			Group:   spec.SchemeGroupVersion.Group,
+			Version: spec.SchemeGroupVersion.Version,
+			Scope:   apiextensionsv1beta1.NamespaceScoped,
+			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+				Plural: spec.ServiceRoleCRDResourcePlural,
+				Kind:   spec.ServiceRoleCRDResourceKind,
+			},
+		},
+	}
+	_, err = clientset.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
+
 	return err
 }
 
