@@ -27,6 +27,7 @@ import (
 	"github.com/nats-io/nats-operator/pkg/spec"
 	"github.com/nats-io/nats-operator/pkg/util/retryutil"
 
+	natsalphav3client "github.com/nats-io/nats-operator/pkg/typed-client/versioned/typed/pkg/spec"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -146,11 +147,55 @@ func addTLSConfig(sconfig *natsconf.ServerConfig, cs spec.ClusterSpec) {
 }
 
 // addAuthConfig fills the Auth configuration to be used in config map.
-func addAuthConfig(kubecli corev1client.CoreV1Interface, ns string, sconfig *natsconf.ServerConfig, cs spec.ClusterSpec) error {
+func addAuthConfig(kubecli corev1client.CoreV1Interface, operatorcli natsalphav3client.PkgSpecInterface, ns string, clusterName string, sconfig *natsconf.ServerConfig, cs spec.ClusterSpec) error {
 	if cs.Auth == nil {
 		return nil
 	}
-	if cs.Auth.ClientsAuthSecret != "" {
+	// TODO: Cache the version of the resource
+	// TODO: This needs further refactoring...
+	if cs.Auth.EnableServiceAccounts {
+		users := make([]*natsconf.User, 0)
+		roles, err := operatorcli.ServiceRoles(ns).List(metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("nats_cluster=%s", clusterName),
+		})
+		if err != nil || len(roles.Items) == 0 {
+			// Nothing to do
+			return nil
+		}
+
+	NextRole:
+		for _, role := range roles.Items {
+			// Lookup for the service account with the name.
+			sa, err := kubecli.ServiceAccounts(ns).Get(role.Spec.ServiceAccountName, metav1.GetOptions{})
+			if err != nil {
+				// Skip looking up this service account
+				continue
+			}
+			for _, secretRef := range sa.Secrets {
+				secret, err := kubecli.Secrets(ns).Get(secretRef.Name, metav1.GetOptions{})
+				if err == nil {
+					token := secret.Data["token"]
+					user := &natsconf.User{
+						User:     role.Spec.ServiceAccountName,
+						Password: string(token),
+						Permissions: &natsconf.Permissions{
+							Publish:   role.Spec.Permissions.Publish,
+							Subscribe: role.Spec.Permissions.Subscribe,
+						},
+					}
+					users = append(users, user)
+					continue NextRole
+				}
+			}
+		}
+
+		// Expand authorization rules from the service account tokens.
+		sconfig.Authorization = &natsconf.AuthorizationConfig{
+			Users: users,
+		}
+
+		return nil
+	} else if cs.Auth.ClientsAuthSecret != "" {
 		result, err := kubecli.Secrets(ns).Get(cs.Auth.ClientsAuthSecret, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -209,7 +254,7 @@ func CreateAndWaitPod(kubecli corev1client.CoreV1Interface, ns string, pod *v1.P
 }
 
 // CreateConfigMap creates the config map that is shared by NATS servers in a cluster.
-func CreateConfigMap(kubecli corev1client.CoreV1Interface, clusterName, ns string, cluster spec.ClusterSpec, owner metav1.OwnerReference) error {
+func CreateConfigMap(kubecli corev1client.CoreV1Interface, operatorcli natsalphav3client.PkgSpecInterface, clusterName, ns string, cluster spec.ClusterSpec, owner metav1.OwnerReference) error {
 	sconfig := &natsconf.ServerConfig{
 		Port:     int(constants.ClientPort),
 		HTTPPort: int(constants.MonitoringPort),
@@ -218,7 +263,7 @@ func CreateConfigMap(kubecli corev1client.CoreV1Interface, clusterName, ns strin
 		},
 	}
 	addTLSConfig(sconfig, cluster)
-	err := addAuthConfig(kubecli, ns, sconfig, cluster)
+	err := addAuthConfig(kubecli, operatorcli, ns, clusterName, sconfig, cluster)
 	if err != nil {
 		return err
 	}
@@ -256,7 +301,7 @@ func CreateConfigMap(kubecli corev1client.CoreV1Interface, clusterName, ns strin
 
 // UpdateConfigMap applies the new configuration of the cluster,
 // such as modifying the routes available in the cluster.
-func UpdateConfigMap(kubecli corev1client.CoreV1Interface, clusterName, ns string, cluster spec.ClusterSpec, owner metav1.OwnerReference) error {
+func UpdateConfigMap(kubecli corev1client.CoreV1Interface, operatorcli natsalphav3client.PkgSpecInterface, clusterName, ns string, cluster spec.ClusterSpec, owner metav1.OwnerReference) error {
 	// List all available pods then generate the routes
 	// for the NATS cluster.
 	routes := make([]string, 0)
@@ -285,7 +330,7 @@ func UpdateConfigMap(kubecli corev1client.CoreV1Interface, clusterName, ns strin
 		},
 	}
 	addTLSConfig(sconfig, cluster)
-	err = addAuthConfig(kubecli, ns, sconfig, cluster)
+	err = addAuthConfig(kubecli, operatorcli, ns, clusterName, sconfig, cluster)
 	if err != nil {
 		return err
 	}
@@ -533,6 +578,25 @@ func MustNewKubeClient() corev1client.CoreV1Interface {
 	}
 
 	return corev1client.NewForConfigOrDie(cfg)
+}
+
+func MustNewOperatorClient() natsalphav3client.PkgSpecInterface {
+	var (
+		cfg *rest.Config
+		err error
+	)
+
+	if len(local.KubeConfigPath) == 0 {
+		cfg, err = InClusterConfig()
+	} else {
+		cfg, err = clientcmd.BuildConfigFromFlags("", local.KubeConfigPath)
+	}
+
+	if err != nil {
+		panic(err)
+	}
+
+	return natsalphav3client.NewForConfigOrDie(cfg)
 }
 
 func InClusterConfig() (*rest.Config, error) {

@@ -216,12 +216,12 @@ func newControllerConfig() controller.Config {
 			logrus.Fatalf("invalid service account name specified")
 		}
 	}
-
 	cfg := controller.Config{
 		Namespace:      namespace,
 		ServiceAccount: serviceAccount,
 		KubeCli:        kubecli,
 		KubeExtCli:     kubernetesutil.MustNewKubeExtClient(),
+		OperatorCli:    kubernetesutil.MustNewOperatorClient(),
 	}
 
 	return cfg
