@@ -170,7 +170,6 @@ func addAuthConfig(kubecli corev1client.CoreV1Interface, operatorcli natsalphav3
 		for _, role := range roles.Items {
 			// Lookup for the service account with the same name as the role.
 			sa, err := kubecli.ServiceAccounts(ns).Get(role.Name, metav1.GetOptions{})
-			fmt.Println(err)
 			if err != nil {
 				continue NextRole
 			}
@@ -178,7 +177,6 @@ func addAuthConfig(kubecli corev1client.CoreV1Interface, operatorcli natsalphav3
 			// TODO: Add custom expiration to the issued tokens.
 			tokenSecretName := fmt.Sprintf("%s-%s-bound-token", role.Spec.ServiceAccountName, clusterName)
 			cs, err := kubecli.Secrets(ns).Get(tokenSecretName, metav1.GetOptions{})
-			fmt.Println(err)
 			if err == nil {
 				// We always get everything and apply, in case there is a diff
 				// then the reloader will apply them.
@@ -223,7 +221,6 @@ func addAuthConfig(kubecli corev1client.CoreV1Interface, operatorcli natsalphav3
 			})
 			tokenSecret, err = kubecli.Secrets(ns).Create(tokenSecret)
 			if err != nil {
-				fmt.Println(err)
 				continue NextRole
 			}
 
@@ -245,7 +242,6 @@ func addAuthConfig(kubecli corev1client.CoreV1Interface, operatorcli natsalphav3
 			tr, err := kubecli.ServiceAccounts(ns).CreateToken(role.Spec.ServiceAccountName, ar)
 			if err != nil {
 				// Skip creating token
-				fmt.Println(err)
 				continue NextRole
 			}
 
@@ -257,7 +253,6 @@ func addAuthConfig(kubecli corev1client.CoreV1Interface, operatorcli natsalphav3
 				}
 				tokenSecret, err = kubecli.Secrets(ns).Update(tokenSecret)
 				if err != nil {
-					fmt.Println(err)
 					continue NextRole
 				}
 				user := &natsconf.User{
