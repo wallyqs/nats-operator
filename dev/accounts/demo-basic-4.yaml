@@ -41,8 +41,8 @@ spec:
   serviceAccountName: demo-nats-user
   permissions:
     publish: ["foo.*", "foo.bar.quux"]
-    subscribe: ["foo.bar", "greetings"]
-    # subscribe: ["foo.bar", "greetings", "hello.world"]
+    # subscribe: ["foo.bar", "greetings"]
+    subscribe: ["foo.bar", "greetings", "hello.world"]
 
 ---
 apiVersion: nats.io/v1alpha3
