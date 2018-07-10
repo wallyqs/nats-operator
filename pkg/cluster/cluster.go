@@ -28,7 +28,7 @@ import (
 	"github.com/nats-io/nats-operator/pkg/debug"
 	"github.com/nats-io/nats-operator/pkg/garbagecollection"
 	"github.com/nats-io/nats-operator/pkg/spec"
-	natsalphav3client "github.com/nats-io/nats-operator/pkg/typed-client/versioned/typed/pkg/spec"
+	natsalphav2client "github.com/nats-io/nats-operator/pkg/typed-client/v1alpha2/typed/pkg/spec"
 	kubernetesutil "github.com/nats-io/nats-operator/pkg/util/kubernetes"
 	"github.com/nats-io/nats-operator/pkg/util/retryutil"
 	"github.com/sirupsen/logrus"
@@ -60,7 +60,7 @@ type clusterEvent struct {
 type Config struct {
 	ServiceAccount string
 	KubeCli        corev1client.CoreV1Interface
-	OperatorCli    natsalphav3client.PkgSpecInterface
+	OperatorCli    natsalphav2client.PkgSpecInterface
 }
 
 type Cluster struct {

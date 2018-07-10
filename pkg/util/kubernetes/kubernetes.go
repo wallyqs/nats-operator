@@ -27,7 +27,7 @@ import (
 	"github.com/nats-io/nats-operator/pkg/spec"
 	"github.com/nats-io/nats-operator/pkg/util/retryutil"
 
-	natsalphav3client "github.com/nats-io/nats-operator/pkg/typed-client/versioned/typed/pkg/spec"
+	natsalphav2client "github.com/nats-io/nats-operator/pkg/typed-client/v1alpha2/typed/pkg/spec"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -149,7 +149,7 @@ func addTLSConfig(sconfig *natsconf.ServerConfig, cs spec.ClusterSpec) {
 
 func addAuthConfig(
 	kubecli corev1client.CoreV1Interface,
-	operatorcli natsalphav3client.PkgSpecInterface,
+	operatorcli natsalphav2client.PkgSpecInterface,
 	ns string,
 	clusterName string,
 	sconfig *natsconf.ServerConfig,
@@ -341,7 +341,7 @@ func CreateAndWaitPod(kubecli corev1client.CoreV1Interface, ns string, pod *v1.P
 }
 
 // CreateConfigMap creates the config map that is shared by NATS servers in a cluster.
-func CreateConfigMap(kubecli corev1client.CoreV1Interface, operatorcli natsalphav3client.PkgSpecInterface, clusterName, ns string, cluster spec.ClusterSpec, owner metav1.OwnerReference) error {
+func CreateConfigMap(kubecli corev1client.CoreV1Interface, operatorcli natsalphav2client.PkgSpecInterface, clusterName, ns string, cluster spec.ClusterSpec, owner metav1.OwnerReference) error {
 	sconfig := &natsconf.ServerConfig{
 		Port:     int(constants.ClientPort),
 		HTTPPort: int(constants.MonitoringPort),
@@ -385,7 +385,7 @@ func CreateConfigMap(kubecli corev1client.CoreV1Interface, operatorcli natsalpha
 
 // UpdateConfigMap applies the new configuration of the cluster,
 // such as modifying the routes available in the cluster.
-func UpdateConfigMap(kubecli corev1client.CoreV1Interface, operatorcli natsalphav3client.PkgSpecInterface, clusterName, ns string, cluster spec.ClusterSpec, owner metav1.OwnerReference) error {
+func UpdateConfigMap(kubecli corev1client.CoreV1Interface, operatorcli natsalphav2client.PkgSpecInterface, clusterName, ns string, cluster spec.ClusterSpec, owner metav1.OwnerReference) error {
 	// List all available pods then generate the routes
 	// for the NATS cluster.
 	routes := make([]string, 0)
@@ -664,7 +664,7 @@ func MustNewKubeClient() corev1client.CoreV1Interface {
 	return corev1client.NewForConfigOrDie(cfg)
 }
 
-func MustNewOperatorClient() natsalphav3client.PkgSpecInterface {
+func MustNewOperatorClient() natsalphav2client.PkgSpecInterface {
 	var (
 		cfg *rest.Config
 		err error
@@ -680,7 +680,7 @@ func MustNewOperatorClient() natsalphav3client.PkgSpecInterface {
 		panic(err)
 	}
 
-	return natsalphav3client.NewForConfigOrDie(cfg)
+	return natsalphav2client.NewForConfigOrDie(cfg)
 }
 
 func InClusterConfig() (*rest.Config, error) {
