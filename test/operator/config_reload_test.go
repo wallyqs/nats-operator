@@ -446,7 +446,7 @@ func TestConfigNatsServiceRolesReload_Auth(t *testing.T) {
 		},
 		Spec: spec.ClusterSpec{
 			Size:    size,
-			Version: "1.2.0",
+			Version: "1.1.0",
 			Pod: &spec.PodPolicy{
 				EnableConfigReload: true,
 			},
@@ -536,7 +536,7 @@ func TestConfigNatsServiceRolesReload_Auth(t *testing.T) {
 	}
 
 	// Should poll until pod is available
-	err = k8swaitutil.Poll(3*time.Second, 1*time.Minute, func() (bool, error) {
+	err = k8swaitutil.Poll(3*time.Second, 2*time.Minute, func() (bool, error) {
 		pod2, err := cl.kc.Pods(namespace).Get(opsPodName, k8smetav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -617,7 +617,7 @@ func TestConfigNatsServiceRolesReload_Auth(t *testing.T) {
 	}
 
 	// Should poll until pod is available
-	err = k8swaitutil.Poll(3*time.Second, 1*time.Minute, func() (bool, error) {
+	err = k8swaitutil.Poll(3*time.Second, 2*time.Minute, func() (bool, error) {
 		pod2, err := cl.kc.Pods(namespace).Get(opsPodName, k8smetav1.GetOptions{})
 		if err != nil {
 			return false, err
