@@ -46,7 +46,8 @@ spec:
       serviceAccountName: nats-operator
       containers:
       - name: nats-operator
-        image: connecteverything/nats-operator:0.3.0-v1alpha2
+        # image: connecteverything/nats-operator:0.3.0-v1alpha2
+        image: wallyqs/nats-operator:tls-map
         imagePullPolicy: Always
         ports:
         - name: readyz
