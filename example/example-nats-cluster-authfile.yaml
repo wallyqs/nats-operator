@@ -1,0 +1,32 @@
+# This is an example NatsCluster manifest which uses a 3rd party initContainer
+# to fetch the authorization credentials from outside kubernetes.
+#
+# An example of this could be consul-template getting user/passwords from vault.
+apiVersion: "nats.io/v1alpha2"
+kind: "NatsCluster"
+metadata:
+  name: my-nats-cluster
+  namespace: nats-stuff
+spec:
+  size: 5
+  version: "1.3.0"
+  service:
+    maxPayload: 20971520
+  pod:
+    volumeMounts:
+      - name: authconfig
+        mountPath: /authconfig
+  template:
+    serviceAccountName: my-secrets-getting-sa
+    initContainers:
+      - name: secret-getter
+        image: "...."
+        args: ["/authconfig/auth.json"]
+        volumeMounts:
+          - name: authconfig
+            mountPath: /authconfig
+    volumes:
+      - name: authconfig
+        emptyDir: {}
+  auth:
+    clientAuthFile: "/authconfig/auth.json"

@@ -36,6 +36,7 @@ func main() {
 	fs.StringVar(&nconfig.PidFile, "pid", "/var/run/nats/gnatsd.pid", "NATS Server Pid File")
 	fs.StringVar(&nconfig.ConfigFile, "c", "/etc/nats/gnatsd.conf", "NATS Server Config File")
 	fs.StringVar(&nconfig.ConfigFile, "config", "/etc/nats/gnatsd.conf", "NATS Server Config File")
+	fs.StringVar(&nconfig.AuthFile, "authfile", "", "NATS Auth File Path (disabled by default)")
 	fs.IntVar(&nconfig.MaxRetries, "max-retries", 5, "Max attempts to trigger reload")
 	fs.IntVar(&nconfig.RetryWaitSecs, "retry-wait-secs", 2, "Time to back off when reloading fails before retrying")
 

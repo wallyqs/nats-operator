@@ -80,8 +80,8 @@ func natsPodContainer(clusterName, version string, serverImage string, enableCli
 }
 
 // natsPodReloaderContainer returns a NATS server pod container spec for configuration reloader.
-func natsPodReloaderContainer(image, tag, pullPolicy string) v1.Container {
-	return v1.Container{
+func natsPodReloaderContainer(image, tag, pullPolicy, authFilePath string) v1.Container {
+	container := v1.Container{
 		Name:            "reloader",
 		Image:           fmt.Sprintf("%s:%s", image, tag),
 		ImagePullPolicy: v1.PullPolicy(pullPolicy),
@@ -93,6 +93,10 @@ func natsPodReloaderContainer(image, tag, pullPolicy string) v1.Container {
 			constants.PidFilePath,
 		},
 	}
+	if authFilePath != "" {
+		container.Command = append(container.Command, "-authfile", authFilePath)
+	}
+	return container
 }
 
 // natsPodMetricsContainer returns a NATS server pod container spec for prometheus metrics exporter.

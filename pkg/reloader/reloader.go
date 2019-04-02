@@ -21,6 +21,7 @@ import (
 type Config struct {
 	PidFile       string
 	ConfigFile    string
+	AuthFile      string
 	MaxRetries    int
 	RetryWaitSecs int
 }
@@ -96,6 +97,13 @@ func (r *Reloader) Run(ctx context.Context) error {
 	// it is either recreated or written into.
 	if err := configWatcher.Add(path.Dir(r.ConfigFile)); err != nil {
 		return err
+	}
+
+	// If we have an auth file configuration, watch it also.
+	if r.AuthFile != "" {
+		if err := configWatcher.Add(r.AuthFile); err != nil {
+			return err
+		}
 	}
 
 	attempts = 0
