@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/nats-io/go-nats"
 	natsv1alpha2 "github.com/nats-io/nats-operator/pkg/apis/nats/v1alpha2"
 	natsconf "github.com/nats-io/nats-operator/pkg/conf"
@@ -228,6 +229,7 @@ func ConfigReloadTestHelper(t *testing.T, customizer NatsClusterCustomizerWSecre
 	// Create a NatsCluster resource with a single member, having configuration reloading enabled and using the secret above for client authentication.
 	natsCluster, err = f.CreateCluster(f.Namespace, "test-nats-", size, version, func(natsCluster *natsv1alpha2.NatsCluster) {
 		customizer(natsCluster, cas)
+		t.Log(spew.Sdump(natsCluster))
 	})
 
 	if err != nil {
