@@ -41,9 +41,13 @@ type Reloader struct {
 	// quit shutsdown the reloader.
 	quit func()
 
-	// lastAppliedVersion is the last config update
-	// done by the proces..
+	// lastAppliedVersion is the digest of the contents
+	// from the previous update.
 	lastAppliedVersion []byte
+
+	// lastAppliedAuthFileVersion is the digest of the contents
+	// from the previous auth config file.
+	lastAppliedAuthFileVersion []byte
 }
 
 // Run starts the main loop.
@@ -113,31 +117,41 @@ func (r *Reloader) Run(ctx context.Context) error {
 			return nil
 		case event := <-configWatcher.Events:
 			log.Printf("Event: %+v \n", event)
-			// FIXME: This captures all events in the same folder, should
-			// narrow down to updates to the config file involved only.
 			if event.Op != fsnotify.Write && event.Op != fsnotify.Create {
 				continue
 			}
 
-			h := sha256.New()
-			f, err := os.Open(r.ConfigFile)
+			var (
+				configDigest        []byte
+				authFileDigest      []byte
+				configUnchanged     bool
+				authConfigUnchanged bool
+			)
+			configDigest, err = digest(r.ConfigFile)
 			if err != nil {
 				log.Printf("Error: %s\n", err)
 				continue
 			}
-			if _, err := io.Copy(h, f); err != nil {
-				log.Printf("Error: %s\n", err)
-				continue
-			}
-			digest := h.Sum(nil)
 			if r.lastAppliedVersion != nil {
-				if bytes.Equal(r.lastAppliedVersion, digest) {
-					// Skip since no meaningful change
+				configUnchanged = bytes.Equal(r.lastAppliedVersion, configDigest)
+			}
+
+			if r.AuthFile != "" {
+				authFileDigest, err = digest(r.AuthFile)
+				if err != nil {
+					log.Printf("Error: %s\n", err)
 					continue
 				}
+				if r.lastAppliedAuthFileVersion != nil {
+					authConfigUnchanged = bytes.Equal(r.lastAppliedAuthFileVersion, authFileDigest)
+				}
 			}
-			r.lastAppliedVersion = digest
-
+			if configUnchanged && (r.AuthFile != "" && authConfigUnchanged) {
+				// Skip since no changes
+				continue
+			}
+			r.lastAppliedVersion = configDigest
+			r.lastAppliedAuthFileVersion = authFileDigest
 		case err := <-configWatcher.Errors:
 			log.Printf("Error: %s\n", err)
 			continue
@@ -164,6 +178,19 @@ func (r *Reloader) Run(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func digest(file string) ([]byte, error) {
+	h := sha256.New()
+	f, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	if _, err := io.Copy(h, f); err != nil {
+		return nil, nil
+	}
+	return h.Sum(nil), nil
 }
 
 // Stop shutsdown the process.
