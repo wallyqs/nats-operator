@@ -540,9 +540,7 @@ func UpdateConfigSecret(
 
 	// FIXME: Quoted "include" causes include to be ignored.
 	// Remove once using NATS v2.0 as the default container image.
-	if cluster.Pod != nil && cluster.Pod.AdvertiseExternalIP {
-		rawConfig = bytes.Replace(rawConfig, []byte(`"include":`), []byte("include "), 1)
-	}
+	rawConfig = bytes.Replace(rawConfig, []byte(`"include":`), []byte("include "), -1)
 
 	cm, err := kubecli.Secrets(ns).Get(clusterName, metav1.GetOptions{})
 	if err != nil {
