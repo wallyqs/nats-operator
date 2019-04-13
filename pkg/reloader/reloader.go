@@ -110,11 +110,6 @@ WaitForEvent:
 			return nil
 		case event := <-configWatcher.Events:
 			log.Printf("Event: %+v \n", event)
-			// FIXME: This captures all events in the same folder, should
-			// narrow down to updates to the config file involved only.
-			if event.Op != fsnotify.Write && event.Op != fsnotify.Create {
-				continue
-			}
 			touchedInfo, err := os.Stat(event.Name)
 			if err != nil {
 				continue
@@ -127,9 +122,8 @@ WaitForEvent:
 					continue WaitForEvent
 				}
 				if !os.SameFile(touchedInfo, configInfo) {
-					continue WaitForEvent
+					continue
 				}
-
 				h := sha256.New()
 				f, err := os.Open(configFile)
 				if err != nil {
