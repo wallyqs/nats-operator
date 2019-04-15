@@ -97,7 +97,7 @@ func natsPodReloaderContainer(image, tag, pullPolicy, authFilePath string) v1.Co
 	if authFilePath != "" {
 		// The volume is mounted as a subdirectory under the NATS config.
 		af := filepath.Join(constants.ConfigMapMountPath, authFilePath)
-		container.Command = append(container.Command, "-authfile", af)
+		container.Command = append(container.Command, "-c", af)
 	}
 	return container
 }

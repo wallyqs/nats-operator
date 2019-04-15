@@ -23,7 +23,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -332,7 +331,6 @@ func (c *Cluster) createPod() (*v1.Pod, error) {
 
 	// Create the pod.
 	pod := kubernetesutil.NewNatsPodSpec(c.cluster.Namespace, name, c.cluster.Name, c.cluster.Spec, c.cluster.AsOwner())
-	spew.Dump(pod)
 	pod, err = c.config.KubeCli.Pods(c.cluster.Namespace).Create(pod)
 	if err != nil {
 		return nil, err
