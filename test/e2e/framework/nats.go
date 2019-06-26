@@ -16,6 +16,7 @@ package framework
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/nats-io/go-nats"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,8 +31,22 @@ import (
 // It is the caller's responsibility to close the connection when it is no longer needed.
 func (f *Framework) ConnectToNatsClusterWithUsernamePassword(natsCluster *natsv1alpha2.NatsCluster, username, password string) (*nats.Conn, error) {
 	// Connect to the NATS cluster represented by the specified NatsCluster resource using the specified credentials.
-	c, err := nats.Connect(fmt.Sprintf("nats://%s.%s:%d", kubernetes.ClientServiceName(natsCluster.Name), natsCluster.Namespace, constants.ClientPort), nats.UserInfo(username, password))
-	if err != nil {
+	endpoint := fmt.Sprintf("nats://%s:%d", kubernetes.ServiceName(natsCluster.Name), constants.ClientPort)
+	fmt.Println("----", endpoint)
+
+	var c *nats.Conn
+	var err error
+	for i := 0; i < 60; i++ {
+		c, err = nats.Connect(endpoint, nats.UserInfo(username, password))
+		fmt.Println("Error:", err)
+		if err != nil {
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		fmt.Println("Connected to", endpoint)
+		break
+	}
+	if c == nil {
 		return nil, err
 	}
 	return c, nil
