@@ -380,6 +380,9 @@ type AuthConfig struct {
 
 	// TLSVerifyAndMap toggles verify and map to auth based on TLS certs.
 	TLSVerifyAndMap bool `json:"tlsVerifyAndMap,omitempty"`
+
+	// ResolverConfigFile
+	ResolverConfigFile string `json:"resolverConfigFile,omitempty"`
 }
 
 func (c *ClusterSpec) Validate() error {

@@ -365,6 +365,8 @@ func addAuthConfig(
 			Include: cs.Auth.ClientsAuthFile,
 		}
 		return nil
+	} else if cs.Auth.ResolverConfigFile != "" {
+		sconfig.Include = cs.Auth.ResolverConfigFile
 	}
 	return nil
 }
@@ -962,7 +964,11 @@ func NewNatsPodSpec(namespace, name, clusterName string, cs v1alpha2.ClusterSpec
 
 		authFilePath := ""
 		if cs.Auth != nil {
-			authFilePath = cs.Auth.ClientsAuthFile
+			if cs.Auth.ClientsAuthFile != "" {
+				authFilePath = cs.Auth.ClientsAuthFile
+			} else if cs.Auth.ResolverConfigFile != "" {
+				authFilePath = cs.Auth.ResolverConfigFile
+			}
 		}
 
 		reloaderContainer := natsPodReloaderContainer(image, imageTag, imagePullPolicy, authFilePath)
