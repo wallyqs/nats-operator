@@ -214,12 +214,6 @@ func (c *Controller) processQueueItem(key string) error {
 }
 
 func (c *Controller) Run(ctx context.Context) error {
-	// Register our CRDs, waiting for them to become ready.
-	err := kubernetesutil.InitCRDs(c.KubeExtCli)
-	if err != nil {
-		return err
-	}
-
 	// Start the shared informer factories.
 	go c.kubeInformerFactory.Start(ctx.Done())
 	go c.natsInformerFactory.Start(ctx.Done())
