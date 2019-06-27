@@ -462,6 +462,13 @@ func CreateConfigSecret(kubecli corev1client.CoreV1Interface, operatorcli natsal
 
 	// FIXME: Quoted "include" causes include to be ignored.
 	rawConfig = bytes.Replace(rawConfig, []byte(`"include":`), []byte("include "), -1)
+	rawConfig = rawConfig[1:len(rawConfig)-2]
+
+	// Add external ip include in case required
+	if cluster.Pod != nil && cluster.Pod.AdvertiseExternalIP {
+		bs := []byte(fmt.Sprintf("\ninclude \"%s\"\n\n", filepath.Join(".", constants.BootConfigFilePath)))
+		rawConfig = append(rawConfig, bs...)
+	}
 
 	labels := LabelsForCluster(clusterName)
 	cm := &v1.Secret{
@@ -507,6 +514,13 @@ func UpdateConfigSecret(
 
 	// FIXME: Quoted "include" causes include to be ignored.
 	rawConfig = bytes.Replace(rawConfig, []byte(`"include":`), []byte("include "), -1)
+	rawConfig = rawConfig[1:len(rawConfig)-2]
+
+	// Add external ip include in case required
+	if cluster.Pod != nil && cluster.Pod.AdvertiseExternalIP {
+		bs := []byte(fmt.Sprintf("\ninclude \"%s\"\n\n", filepath.Join(".", constants.BootConfigFilePath)))
+		rawConfig = append(rawConfig, bs...)
+	}
 
 	cm, err := kubecli.Secrets(ns).Get(clusterName, metav1.GetOptions{})
 	if err != nil {
@@ -571,9 +585,6 @@ func addConfig(clusterName string, cluster v1alpha2.ClusterSpec) *natsconf.Serve
 	// Observe .spec.lameDuckDurationSeconds if specified.
 	if cluster.LameDuckDurationSeconds != nil {
 		sconfig.LameDuckDuration = fmt.Sprintf("%ds", *cluster.LameDuckDurationSeconds)
-	}
-	if cluster.Pod != nil && cluster.Pod.AdvertiseExternalIP {
-		sconfig.Include = filepath.Join(".", constants.BootConfigFilePath)
 	}
 	if cluster.GatewayConfig != nil {
 		addGatewayConfig(sconfig, cluster)
