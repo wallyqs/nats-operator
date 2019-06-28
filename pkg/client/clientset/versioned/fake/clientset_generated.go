@@ -18,8 +18,8 @@ package fake
 
 import (
 	clientset "github.com/nats-io/nats-operator/pkg/client/clientset/versioned"
-	natsv1alpha2 "github.com/nats-io/nats-operator/pkg/client/clientset/versioned/typed/nats/v1alpha2"
-	fakenatsv1alpha2 "github.com/nats-io/nats-operator/pkg/client/clientset/versioned/typed/nats/v1alpha2/fake"
+	natsv1 "github.com/nats-io/nats-operator/pkg/client/clientset/versioned/typed/nats/v1"
+	fakenatsv1 "github.com/nats-io/nats-operator/pkg/client/clientset/versioned/typed/nats/v1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -69,12 +69,12 @@ func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 
 var _ clientset.Interface = &Clientset{}
 
-// NatsV1alpha2 retrieves the NatsV1alpha2Client
-func (c *Clientset) NatsV1alpha2() natsv1alpha2.NatsV1alpha2Interface {
-	return &fakenatsv1alpha2.FakeNatsV1alpha2{Fake: &c.Fake}
+// NatsV1 retrieves the NatsV1Client
+func (c *Clientset) NatsV1() natsv1.NatsV1Interface {
+	return &fakenatsv1.FakeNatsV1{Fake: &c.Fake}
 }
 
-// Nats retrieves the NatsV1alpha2Client
-func (c *Clientset) Nats() natsv1alpha2.NatsV1alpha2Interface {
-	return &fakenatsv1alpha2.FakeNatsV1alpha2{Fake: &c.Fake}
+// Nats retrieves the NatsV1Client
+func (c *Clientset) Nats() natsv1.NatsV1Interface {
+	return &fakenatsv1.FakeNatsV1{Fake: &c.Fake}
 }

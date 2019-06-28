@@ -34,10 +34,10 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/util/slice"
 
-	"github.com/nats-io/nats-operator/pkg/apis/nats/v1alpha2"
+	natsv1 "github.com/nats-io/nats-operator/pkg/apis/nats/v1"
 	natsclient "github.com/nats-io/nats-operator/pkg/client/clientset/versioned"
-	natsalphav2client "github.com/nats-io/nats-operator/pkg/client/clientset/versioned/typed/nats/v1alpha2"
-	natslisters "github.com/nats-io/nats-operator/pkg/client/listers/nats/v1alpha2"
+	natsalphav2client "github.com/nats-io/nats-operator/pkg/client/clientset/versioned/typed/nats/v1"
+	natslisters "github.com/nats-io/nats-operator/pkg/client/listers/nats/v1"
 	"github.com/nats-io/nats-operator/pkg/constants"
 	"github.com/nats-io/nats-operator/pkg/debug"
 	kubernetesutil "github.com/nats-io/nats-operator/pkg/util/kubernetes"
@@ -64,8 +64,8 @@ const (
 type Config struct {
 	// Deprecated: Use KubeClient and its CoreV1() function instead.
 	KubeCli corev1client.CoreV1Interface
-	// Deprecated: Use NatsClient and its NatsV1alpha2() function instead.
-	OperatorCli           natsalphav2client.NatsV1alpha2Interface
+	// Deprecated: Use NatsClient and its NatsV1() function instead.
+	OperatorCli           natsalphav2client.NatsV1Interface
 	PodLister             corev1listers.PodLister
 	SecretLister          corev1listers.SecretLister
 	ServiceLister         corev1listers.ServiceLister
@@ -84,14 +84,14 @@ type Cluster struct {
 	// config holds the clients and listers required for the reconciler to operate.
 	config Config
 	// cluster holds the NatsCluster resource which we are going to reconcile.
-	cluster *v1alpha2.NatsCluster
+	cluster *natsv1.NatsCluster
 	// originalCluster holds the original, unmodified NatsCluster resource.
 	// Used to create a patch in the end of the reconcile loop.
-	originalCluster *v1alpha2.NatsCluster
+	originalCluster *natsv1.NatsCluster
 }
 
 // New returns a new instance of the reconciler for NatsCluster resources.
-func New(config Config, cl *v1alpha2.NatsCluster) *Cluster {
+func New(config Config, cl *natsv1.NatsCluster) *Cluster {
 	return &Cluster{
 		logger:          logrus.WithField("pkg", "cluster").WithField("namespace", cl.Namespace).WithField("cluster-name", cl.Name),
 		debugLogger:     debug.New(cl.Namespace, cl.Name),
@@ -484,7 +484,7 @@ func (c *Cluster) updateCluster() error {
 	if reflect.DeepEqual(c.originalCluster, c.cluster) {
 		return nil
 	}
-	patchBytes, err := kubernetesutil.CreatePatch(c.originalCluster, c.cluster, &v1alpha2.NatsCluster{})
+	patchBytes, err := kubernetesutil.CreatePatch(c.originalCluster, c.cluster, &natsv1.NatsCluster{})
 	if err != nil {
 		return err
 	}

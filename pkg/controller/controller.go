@@ -1,4 +1,4 @@
-// Copyright 2017 The nats-operator Authors
+// Copyright 2017-2019 The nats-operator Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,10 +32,10 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/nats-io/nats-operator/pkg/apis/nats/v1alpha2"
+	natsv1 "github.com/nats-io/nats-operator/pkg/apis/nats/v1"
 	natsclient "github.com/nats-io/nats-operator/pkg/client/clientset/versioned"
 	natsinformers "github.com/nats-io/nats-operator/pkg/client/informers/externalversions"
-	natslisters "github.com/nats-io/nats-operator/pkg/client/listers/nats/v1alpha2"
+	natslisters "github.com/nats-io/nats-operator/pkg/client/listers/nats/v1"
 	"github.com/nats-io/nats-operator/pkg/cluster"
 	"github.com/nats-io/nats-operator/pkg/features"
 	kubernetesutil "github.com/nats-io/nats-operator/pkg/util/kubernetes"
@@ -46,7 +46,7 @@ const (
 	kubeFullResyncPeriod = 24 * time.Hour
 	// natsClusterControllerDefaultThreadiness is the number of workers the NatsCluster controller will use to process items from the work queue.
 	natsClusterControllerThreadiness = 2
-	// natsFullResyncPeriod is the period of time between every full resync of nats.io/v1alpha2 resources by the shared informer factory.
+	// natsFullResyncPeriod is the period of time between every full resync of nats.io/v1 resources by the shared informer factory.
 	natsFullResyncPeriod = 24 * time.Hour
 )
 
@@ -116,8 +116,8 @@ func NewNatsClusterController(cfg Config) *Controller {
 	podInformer := kubeInformerFactory.Core().V1().Pods()
 	secretInformer := kubeInformerFactory.Core().V1().Secrets()
 	serviceInformer := kubeInformerFactory.Core().V1().Services()
-	natsClustersInformer := natsInformerFactory.Nats().V1alpha2().NatsClusters()
-	natsServiceRoleInformer := natsInformerFactory.Nats().V1alpha2().NatsServiceRoles()
+	natsClustersInformer := natsInformerFactory.Nats().V1().NatsClusters()
+	natsServiceRoleInformer := natsInformerFactory.Nats().V1().NatsServiceRoles()
 
 	// Obtain references to listers for the required types.
 	podLister := podInformer.Lister()
@@ -128,7 +128,7 @@ func NewNatsClusterController(cfg Config) *Controller {
 
 	// Create a new instance of Controller that uses the lister above.
 	c := &Controller{
-		genericController:     newGenericController(v1alpha2.CRDResourceKind, natsClusterControllerThreadiness),
+		genericController:     newGenericController(natsv1.CRDResourceKind, natsClusterControllerThreadiness),
 		kubeInformerFactory:   kubeInformerFactory,
 		natsInformerFactory:   natsInformerFactory,
 		podLister:             podLister,
@@ -274,7 +274,7 @@ func (c *Controller) handleObject(obj interface{}) {
 
 	if ownerRef := metav1.GetControllerOf(object); ownerRef != nil {
 		// If this object is not owned by a NatsCluster resource, we should not do anything more with it.
-		if ownerRef.Kind != v1alpha2.CRDResourceKind {
+		if ownerRef.Kind != natsv1.CRDResourceKind {
 			return
 		}
 		// Attempt to get the owning NatsCluster resource.
@@ -289,7 +289,7 @@ func (c *Controller) handleObject(obj interface{}) {
 	}
 
 	// If the current resource is a NatsServiceRole, we must enqueue the NatsCluster referenced by ".metadata.labels.nats_cluster" so that its configuration is reconciled.
-	if object, ok := obj.(*v1alpha2.NatsServiceRole); ok {
+	if object, ok := obj.(*natsv1.NatsServiceRole); ok {
 		c.enqueueByCoordinates(object.Namespace, object.Labels[kubernetesutil.LabelClusterNameKey])
 		return
 	}
@@ -315,7 +315,7 @@ func (c *Controller) handleObject(obj interface{}) {
 func (c *Controller) makeClusterConfig() cluster.Config {
 	return cluster.Config{
 		KubeCli:               c.KubeCli.CoreV1(),
-		OperatorCli:           c.OperatorCli.NatsV1alpha2(),
+		OperatorCli:           c.OperatorCli.NatsV1(),
 		PodLister:             c.podLister,
 		SecretLister:          c.secretLister,
 		ServiceLister:         c.serviceLister,

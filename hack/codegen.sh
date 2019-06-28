@@ -16,5 +16,5 @@ ROOT_PKG="github.com/nats-io/nats-operator"
   "deepcopy,client,informer,lister" \
   ${ROOT_PKG}/pkg/client \
   ${ROOT_PKG}/pkg/apis \
-  nats:v1alpha2 \
+  nats:v1 \
   --go-header-file "${HACK_DIR}/boilerplate.txt"

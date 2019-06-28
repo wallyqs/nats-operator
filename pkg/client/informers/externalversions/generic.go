@@ -19,7 +19,7 @@ package externalversions
 import (
 	"fmt"
 
-	v1alpha2 "github.com/nats-io/nats-operator/pkg/apis/nats/v1alpha2"
+	v1 "github.com/nats-io/nats-operator/pkg/apis/nats/v1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -50,11 +50,11 @@ func (f *genericInformer) Lister() cache.GenericLister {
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
-	// Group=nats, Version=v1alpha2
-	case v1alpha2.SchemeGroupVersion.WithResource("natsclusters"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Nats().V1alpha2().NatsClusters().Informer()}, nil
-	case v1alpha2.SchemeGroupVersion.WithResource("natsserviceroles"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Nats().V1alpha2().NatsServiceRoles().Informer()}, nil
+	// Group=nats, Version=v1
+	case v1.SchemeGroupVersion.WithResource("natsclusters"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Nats().V1().NatsClusters().Informer()}, nil
+	case v1.SchemeGroupVersion.WithResource("natsserviceroles"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Nats().V1().NatsServiceRoles().Informer()}, nil
 
 	}
 

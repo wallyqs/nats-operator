@@ -1,4 +1,4 @@
-// Copyright 2017 The nats-operator Authors
+// Copyright 2017-2019 The nats-operator Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ import (
 	"k8s.io/client-go/tools/watch"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 
-	"github.com/nats-io/nats-operator/pkg/apis/nats/v1alpha2"
+	natsv1 "github.com/nats-io/nats-operator/pkg/apis/nats/v1"
 	"github.com/nats-io/nats-operator/pkg/constants"
 )
 
@@ -146,7 +146,7 @@ func containerWithRequirements(c v1.Container, r v1.ResourceRequirements) v1.Con
 	return c
 }
 
-func natsLivenessProbe(cs v1alpha2.ClusterSpec) *v1.Probe {
+func natsLivenessProbe(cs natsv1.ClusterSpec) *v1.Probe {
 	action := &v1.HTTPGetAction{
 		Port: intstr.IntOrString{IntVal: constants.MonitoringPort},
 	}
@@ -189,7 +189,7 @@ func podWithAntiAffinity(pod *v1.Pod, ls *metav1.LabelSelector) *v1.Pod {
 	return pod
 }
 
-func applyPodPolicy(clusterName string, pod *v1.Pod, policy *v1alpha2.PodPolicy) {
+func applyPodPolicy(clusterName string, pod *v1.Pod, policy *natsv1.PodPolicy) {
 	if policy == nil {
 		return
 	}

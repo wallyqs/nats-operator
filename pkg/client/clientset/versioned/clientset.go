@@ -17,7 +17,7 @@
 package versioned
 
 import (
-	natsv1alpha2 "github.com/nats-io/nats-operator/pkg/client/clientset/versioned/typed/nats/v1alpha2"
+	natsv1 "github.com/nats-io/nats-operator/pkg/client/clientset/versioned/typed/nats/v1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
@@ -25,27 +25,27 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	NatsV1alpha2() natsv1alpha2.NatsV1alpha2Interface
+	NatsV1() natsv1.NatsV1Interface
 	// Deprecated: please explicitly pick a version if possible.
-	Nats() natsv1alpha2.NatsV1alpha2Interface
+	Nats() natsv1.NatsV1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	natsV1alpha2 *natsv1alpha2.NatsV1alpha2Client
+	natsV1 *natsv1.NatsV1Client
 }
 
-// NatsV1alpha2 retrieves the NatsV1alpha2Client
-func (c *Clientset) NatsV1alpha2() natsv1alpha2.NatsV1alpha2Interface {
-	return c.natsV1alpha2
+// NatsV1 retrieves the NatsV1Client
+func (c *Clientset) NatsV1() natsv1.NatsV1Interface {
+	return c.natsV1
 }
 
 // Deprecated: Nats retrieves the default version of NatsClient.
 // Please explicitly pick a version.
-func (c *Clientset) Nats() natsv1alpha2.NatsV1alpha2Interface {
-	return c.natsV1alpha2
+func (c *Clientset) Nats() natsv1.NatsV1Interface {
+	return c.natsV1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -64,7 +64,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
-	cs.natsV1alpha2, err = natsv1alpha2.NewForConfig(&configShallowCopy)
+	cs.natsV1, err = natsv1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
-	cs.natsV1alpha2 = natsv1alpha2.NewForConfigOrDie(c)
+	cs.natsV1 = natsv1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -89,7 +89,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.natsV1alpha2 = natsv1alpha2.New(c)
+	cs.natsV1 = natsv1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

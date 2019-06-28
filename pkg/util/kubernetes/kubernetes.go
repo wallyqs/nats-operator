@@ -39,9 +39,9 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 
-	"github.com/nats-io/nats-operator/pkg/apis/nats/v1alpha2"
+	natsv1 "github.com/nats-io/nats-operator/pkg/apis/nats/v1"
 	natsclient "github.com/nats-io/nats-operator/pkg/client/clientset/versioned"
-	natsalphav2client "github.com/nats-io/nats-operator/pkg/client/clientset/versioned/typed/nats/v1alpha2"
+	natsv1client "github.com/nats-io/nats-operator/pkg/client/clientset/versioned/typed/nats/v1"
 	"github.com/nats-io/nats-operator/pkg/conf"
 	"github.com/nats-io/nats-operator/pkg/constants"
 	"github.com/nats-io/nats-operator/pkg/util/retryutil"
@@ -157,7 +157,7 @@ func CreateMgmtService(kubecli corev1client.CoreV1Interface, clusterName, cluste
 }
 
 // addTLSConfig fills in the TLS configuration to be used in the config map.
-func addTLSConfig(sconfig *natsconf.ServerConfig, cs v1alpha2.ClusterSpec) {
+func addTLSConfig(sconfig *natsconf.ServerConfig, cs natsv1.ClusterSpec) {
 	if cs.TLS == nil {
 		return
 	}
@@ -221,11 +221,11 @@ func addTLSConfig(sconfig *natsconf.ServerConfig, cs v1alpha2.ClusterSpec) {
 
 func addAuthConfig(
 	kubecli corev1client.CoreV1Interface,
-	operatorcli natsalphav2client.NatsV1alpha2Interface,
+	operatorcli natsv1client.NatsV1Interface,
 	ns string,
 	clusterName string,
 	sconfig *natsconf.ServerConfig,
-	cs v1alpha2.ClusterSpec,
+	cs natsv1.ClusterSpec,
 	owner metav1.OwnerReference,
 ) error {
 	if cs.Auth == nil {
@@ -371,7 +371,7 @@ func addAuthConfig(
 	return nil
 }
 
-func addGatewayConfig(sconfig *natsconf.ServerConfig, cluster v1alpha2.ClusterSpec) {
+func addGatewayConfig(sconfig *natsconf.ServerConfig, cluster natsv1.ClusterSpec) {
 	gateways := make([]*natsconf.RemoteGatewayOpts, 0)
 
 	for _, gw := range cluster.GatewayConfig.Gateways {
@@ -399,7 +399,7 @@ func addGatewayConfig(sconfig *natsconf.ServerConfig, cluster v1alpha2.ClusterSp
 }
 
 // addOperatorConfig fills in the operator configuration to be used in the config map.
-func addOperatorConfig(sconfig *natsconf.ServerConfig, cs v1alpha2.ClusterSpec) {
+func addOperatorConfig(sconfig *natsconf.ServerConfig, cs natsv1.ClusterSpec) {
 	if cs.OperatorConfig == nil {
 		return
 	}
@@ -449,7 +449,7 @@ func ConfigSecret(clusterName string) string {
 }
 
 // CreateConfigSecret creates the secret that contains the configuration file for a given NATS cluster..
-func CreateConfigSecret(kubecli corev1client.CoreV1Interface, operatorcli natsalphav2client.NatsV1alpha2Interface, clusterName, ns string, cluster v1alpha2.ClusterSpec, owner metav1.OwnerReference) error {
+func CreateConfigSecret(kubecli corev1client.CoreV1Interface, operatorcli natsv1client.NatsV1Interface, clusterName, ns string, cluster natsv1.ClusterSpec, owner metav1.OwnerReference) error {
 	sconfig := addConfig(clusterName, cluster)
 	err := addAuthConfig(kubecli, operatorcli, ns, clusterName, sconfig, cluster, owner)
 	if err != nil {
@@ -497,9 +497,9 @@ func CreateConfigSecret(kubecli corev1client.CoreV1Interface, operatorcli natsal
 // such as modifying the routes available in the cluster.
 func UpdateConfigSecret(
 	kubecli corev1client.CoreV1Interface,
-	operatorcli natsalphav2client.NatsV1alpha2Interface,
+	operatorcli natsv1client.NatsV1Interface,
 	clusterName, ns string,
-	cluster v1alpha2.ClusterSpec,
+	cluster natsv1.ClusterSpec,
 	owner metav1.OwnerReference,
 ) error {
 	sconfig := addConfig(clusterName, cluster)
@@ -540,7 +540,7 @@ func UpdateConfigSecret(
 	return err
 }
 
-func addConfig(clusterName string, cluster v1alpha2.ClusterSpec) *natsconf.ServerConfig {
+func addConfig(clusterName string, cluster natsv1.ClusterSpec) *natsconf.ServerConfig {
 	sconfig := &natsconf.ServerConfig{
 		Port:     int(constants.ClientPort),
 		HTTPPort: int(constants.MonitoringPort),
@@ -750,7 +750,7 @@ func addOwnerRefToObject(o metav1.Object, r metav1.OwnerReference) {
 }
 
 // NewNatsPodSpec returns a NATS peer pod specification, based on the cluster specification.
-func NewNatsPodSpec(namespace, name, clusterName string, cs v1alpha2.ClusterSpec, owner metav1.OwnerReference) *v1.Pod {
+func NewNatsPodSpec(namespace, name, clusterName string, cs natsv1.ClusterSpec, owner metav1.OwnerReference) *v1.Pod {
 	var (
 		enableClientsHostPort bool
 		annotations           = map[string]string{}

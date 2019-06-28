@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/watch"
 
-	"github.com/nats-io/nats-operator/pkg/apis/nats/v1alpha2"
+	"github.com/nats-io/nats-operator/pkg/apis/nats/v1"
 )
 
 const (
@@ -45,15 +45,15 @@ var (
 		// NatsCluster
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: v1alpha2.CRDName,
+				Name: v1.CRDName,
 			},
 			Spec: extsv1beta1.CustomResourceDefinitionSpec{
-				Group:   v1alpha2.SchemeGroupVersion.Group,
-				Version: v1alpha2.SchemeGroupVersion.Version,
+				Group:   v1.SchemeGroupVersion.Group,
+				Version: v1.SchemeGroupVersion.Version,
 				Scope:   extsv1beta1.NamespaceScoped,
 				Names: extsv1beta1.CustomResourceDefinitionNames{
-					Plural:     v1alpha2.CRDResourcePlural,
-					Kind:       v1alpha2.CRDResourceKind,
+					Plural:     v1.CRDResourcePlural,
+					Kind:       v1.CRDResourceKind,
 					ShortNames: []string{"nats"},
 				},
 			},
@@ -61,15 +61,15 @@ var (
 		// NatsServiceRole
 		{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: v1alpha2.ServiceRoleCRDName,
+				Name: v1.ServiceRoleCRDName,
 			},
 			Spec: extsv1beta1.CustomResourceDefinitionSpec{
-				Group:   v1alpha2.SchemeGroupVersion.Group,
-				Version: v1alpha2.SchemeGroupVersion.Version,
+				Group:   v1.SchemeGroupVersion.Group,
+				Version: v1.SchemeGroupVersion.Version,
 				Scope:   extsv1beta1.NamespaceScoped,
 				Names: extsv1beta1.CustomResourceDefinitionNames{
-					Plural: v1alpha2.ServiceRoleCRDResourcePlural,
-					Kind:   v1alpha2.ServiceRoleCRDResourceKind,
+					Plural: v1.ServiceRoleCRDResourcePlural,
+					Kind:   v1.ServiceRoleCRDResourceKind,
 				},
 			},
 		},
@@ -80,15 +80,15 @@ var (
 
 // NatsClusterCRUpdateFunc is a function to be used when atomically
 // updating a Cluster CR.
-type NatsClusterCRUpdateFunc func(*v1alpha2.NatsCluster)
+type NatsClusterCRUpdateFunc func(*v1.NatsCluster)
 
-func GetClusterList(restcli rest.Interface, ns string) (*v1alpha2.NatsClusterList, error) {
+func GetClusterList(restcli rest.Interface, ns string) (*v1.NatsClusterList, error) {
 	b, err := restcli.Get().RequestURI(listClustersURI(ns)).DoRaw()
 	if err != nil {
 		return nil, err
 	}
 
-	clusters := &v1alpha2.NatsClusterList{}
+	clusters := &v1.NatsClusterList{}
 	if err := json.Unmarshal(b, clusters); err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func GetClusterList(restcli rest.Interface, ns string) (*v1alpha2.NatsClusterLis
 }
 
 func listClustersURI(ns string) string {
-	return fmt.Sprintf("/apis/%s/namespaces/%s/%s", v1alpha2.SchemeGroupVersion.String(), ns, v1alpha2.CRDResourcePlural)
+	return fmt.Sprintf("/apis/%s/namespaces/%s/%s", v1.SchemeGroupVersion.String(), ns, v1.CRDResourcePlural)
 }
 
 // MustNewKubeExtClient creates a new client for the apiextensions.k8s.io/v1beta1 API.
@@ -104,7 +104,7 @@ func MustNewKubeExtClient(cfg *rest.Config) extsclientset.Interface {
 	return extsclientset.NewForConfigOrDie(cfg)
 }
 
-// InitCRDs registers the CRDs for the nats.io/v1alpha2 API and waits for them to become ready.
+// InitCRDs registers the CRDs for the nats.io/v1 API and waits for them to become ready.
 func InitCRDs(extsClient extsclientset.Interface) error {
 	for _, crd := range crds {
 		// Create the CustomResourceDefinition in the api.
